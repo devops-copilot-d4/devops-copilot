@@ -1,0 +1,20 @@
+﻿body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f1117;
+  color: #e6e6e6;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.panel {
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 16px;
+  background: #161925;
+  margin-bottom: 16px;
+}
+

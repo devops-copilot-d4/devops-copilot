@@ -1,0 +1,44 @@
+﻿# Template - the backend fills in {{ }} placeholders dynamically
+# (via k8s.service.js) when deploying an imported repo's service.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{DEPLOYMENT_NAME}}"
+  namespace: "{{NAMESPACE}}"
+  labels:
+    app: "{{DEPLOYMENT_NAME}}"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "{{DEPLOYMENT_NAME}}"
+  template:
+    metadata:
+      labels:
+        app: "{{DEPLOYMENT_NAME}}"
+    spec:
+      containers:
+        - name: "{{DEPLOYMENT_NAME}}"
+          image: "{{IMAGE_NAME}}"
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+

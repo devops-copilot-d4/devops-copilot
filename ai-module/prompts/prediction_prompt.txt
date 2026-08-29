@@ -1,0 +1,14 @@
+﻿You are analyzing a trend in a monitored metric to predict whether it is likely
+to breach its SLO threshold soon, based on recent history.
+
+Respond ONLY with JSON in this exact shape:
+{"willBreach": true|false, "estimatedMinutesToBreach": number|null, "trendDescription": "..."}
+
+Metric name: {{METRIC_NAME}}
+SLO threshold: {{THRESHOLD}} {{COMPARATOR}}
+Recent values (oldest to newest): {{RECENT_VALUES}}
+
+Note: this is intentionally a lightweight trend-based prediction (not a trained
+ML model) to keep the module realistic for the project's timeline - see
+docs/requirement-slo-mapping.md for the reasoning.
+

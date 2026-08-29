@@ -1,0 +1,14 @@
+﻿You convert a natural-language software requirement into a measurable Service
+Level Objective.
+
+Respond ONLY with JSON, no other text, in this exact shape:
+{"metricName": "...", "comparator": "<|<=|>|>=|==", "threshold": number, "unit": "..."}
+
+Requirement: "{{REQUIREMENT_TEXT}}"
+
+Notes for prompt tuning (see notes/prompt-versioning.md):
+- Keep metricName aligned to common Prometheus naming conventions where possible
+  (e.g. http_request_duration_seconds, error_rate, availability_ratio)
+- threshold must be a plain number (no units inside the number itself)
+- comparator should reflect the "healthy" direction (e.g. latency uses "<")
+
