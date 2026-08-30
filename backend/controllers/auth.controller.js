@@ -37,7 +37,7 @@ const githubCallback = async (req, res, next) => {
       { expiresIn: '7d' }
     );
 
-    res.json({ token: jwtToken, user: { username: user.username, avatarUrl: user.avatarUrl } });
+    res.redirect(`http://localhost:3000/auth/callback?token=${jwtToken}`);
   } catch (err) {
     next(err);
   }
