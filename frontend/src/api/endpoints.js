@@ -1,5 +1,10 @@
 ﻿import api from './client';
 
+export const ServicesAPI = {
+  create: (data) => api.post('/services', data),
+  list: () => api.get('/services'),
+};
+
 export const RequirementsAPI = {
   create: (data) => api.post('/requirements', data),
   list: () => api.get('/requirements'),

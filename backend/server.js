@@ -12,6 +12,7 @@ const deploymentRoutes = require('./routes/deployment.routes');
 const monitoringRoutes = require('./routes/monitoring.routes');
 const aiRoutes = require('./routes/ai.routes');
 const recoveryRoutes = require('./routes/recovery.routes');
+const serviceRoutes = require('./routes/service.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +31,7 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/services', serviceRoutes);
 app.use('/api/requirements', requirementRoutes);
 app.use('/api/deployments', deploymentRoutes);
 app.use('/api/monitoring', monitoringRoutes);

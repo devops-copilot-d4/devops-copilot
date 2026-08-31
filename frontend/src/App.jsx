@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
+
 const ProtectedRoute = ({ children }) => {
   const { token } = useAuth();
   return token ? children : <Navigate to="/login" replace />;

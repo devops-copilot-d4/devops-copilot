@@ -13,7 +13,9 @@ const AuthCallbackPage = () => {
   useEffect(() => {
     const token = searchParams.get('token');
     if (token) {
-      login(token, null);
+      const username = searchParams.get('username');
+      const avatar = searchParams.get('avatar');
+      login(token, username ? { username, avatarUrl: avatar } : null);
       navigate('/dashboard');
     } else {
       navigate('/login');
