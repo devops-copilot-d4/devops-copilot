@@ -1,4 +1,4 @@
-﻿import api from './client';
+import api from './client';
 
 export const ServicesAPI = {
   create: (data) => api.post('/services', data),
@@ -32,4 +32,11 @@ export const RecoveryAPI = {
   approve: (id) => api.post(`/recovery/${id}/approve`),
   list: () => api.get('/recovery'),
 };
+
+export const SimulationAPI = {
+  getMetrics: () => api.get('/simulation/metrics'),
+  getPods: (params) => api.get('/simulation/pods', { params }),
+  triggerChaos: (data) => api.post('/simulation/chaos', data),
+};
+
 
