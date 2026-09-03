@@ -2,6 +2,8 @@ const Service = require('../models/Service');
 const SLO = require('../models/SLO');
 const Incident = require('../models/Incident');
 const RecoveryAction = require('../models/RecoveryAction');
+const Requirement = require('../models/Requirement');
+const Metric = require('../models/Metric');
 const k8sService = require('../services/k8s.service');
 const { predictFailureTrend } = require('../services/prediction.service');
 const { analyzeRootCause, explainRecoveryDecision } = require('../services/llm.service');
@@ -54,7 +56,16 @@ const getPodTelemetry = async (req, res, next) => {
 // POST /api/simulation/chaos — 1-Click Anomaly / Traffic Spike Simulation
 const triggerChaosSpike = async (req, res, next) => {
   try {
-    const service = await Service.findOne() || { _id: null, name: 'demo-checkout-service', deploymentName: 'demo-checkout-service', namespace: 'default' };
+    // Ensure a Service document exists (upsert)
+    let service = await Service.findOne();
+    if (!service) {
+      service = await Service.create({
+        name: 'demo-checkout-service',
+        repoUrl: 'https://github.com/devops-copilot-d4/devops-copilot',
+        deploymentName: 'demo-checkout-service',
+        namespace: 'default',
+      });
+    }
 
     // 1. Inject traffic spike in metric stream
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -73,14 +84,41 @@ const triggerChaosSpike = async (req, res, next) => {
       namespace: service.namespace || 'default',
     });
 
-    // 3. Mark SLO violated
+    // 3. Mark SLO violated (upsert if needed)
     let slo = await SLO.findOne();
-    if (slo) {
+    if (!slo) {
+      // Create supporting Requirement & Metric docs for SLO references
+      let requirement = await Requirement.findOne({ service: service._id });
+      if (!requirement) {
+        requirement = await Requirement.create({
+          text: 'Checkout API P95 latency must be below 300ms',
+          service: service._id,
+        });
+      }
+      let metric = await Metric.findOne({ service: service._id });
+      if (!metric) {
+        metric = await Metric.create({
+          name: 'http_request_duration_seconds',
+          source: 'prometheus',
+          service: service._id,
+          queryExpression: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))',
+        });
+      }
+      slo = await SLO.create({
+        requirement: requirement._id,
+        metric: metric._id,
+        comparator: '<',
+        threshold: 300,
+        unit: 'ms',
+        status: 'violated',
+        lastCheckedAt: new Date(),
+      });
+    } else {
       slo.status = 'violated';
       slo.lastCheckedAt = new Date();
       await slo.save();
-      emitEvent('slo:update', { sloId: slo._id, status: 'violated', value: 680 });
     }
+    emitEvent('slo:update', { sloId: slo._id, status: 'violated', value: 680 });
 
     // 4. Create Incident & Run AI RCA
     const rca = await analyzeRootCause({
@@ -90,8 +128,8 @@ const triggerChaosSpike = async (req, res, next) => {
     });
 
     const incident = await Incident.create({
-      service: service._id || undefined,
-      slo: slo?._id || undefined,
+      service: service._id,
+      slo: slo._id,
       type: 'active_violation',
       severity: 'high',
       rootCause: rca.rootCause,
@@ -109,7 +147,7 @@ const triggerChaosSpike = async (req, res, next) => {
 
     const recoveryAction = await RecoveryAction.create({
       incident: incident._id,
-      service: service._id || undefined,
+      service: service._id,
       actionType: 'restart',
       reason,
       requiresApproval: false,
@@ -143,6 +181,11 @@ const triggerChaosSpike = async (req, res, next) => {
       recoveryAction.status = 'success';
       recoveryAction.requirementVerified = true;
       await recoveryAction.save();
+
+      if (incident) {
+        incident.status = 'resolved';
+        await incident.save();
+      }
       emitEvent('recovery:update', { actionId: recoveryAction._id, status: 'success', verified: true });
       emitEvent('metrics:update', { metrics: metricStream });
       emitEvent('k8s:update', await k8sService.getDeploymentStatus({ deploymentName: service.deploymentName || 'demo-checkout-service' }));

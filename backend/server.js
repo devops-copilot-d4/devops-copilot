@@ -22,7 +22,7 @@ const server = http.createServer(app);
 connectDB();
 
 // Core middleware
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // Health check

@@ -55,14 +55,19 @@ const MetricsChartPanel = ({ refreshKey }) => {
     <div className="panel" style={{ position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
-          <h3 style={{ margin: 0 }}>Real-Time Runtime Metrics &amp; SLO Monitoring</h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
-            Live P95 Request Duration vs. Business SLO Threshold ({threshold}ms)
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'var(--cyan)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </span>
+            <span>Real-Time Telemetry &amp; SLO Observability</span>
+          </h3>
+          <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+            Live P95 Request Duration vs. Business SLO Limit ({threshold}ms) • Prometheus Scrape Gateway
           </p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current P95: </span>
-          <strong style={{ fontSize: '16px', color: isBreached ? '#ef4444' : '#22c55e' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Current P95: </span>
+          <strong style={{ fontSize: '18px', color: isBreached ? 'var(--danger)' : 'var(--success)', marginLeft: 4 }}>
             {latestLatency} ms
           </strong>
         </div>
@@ -71,8 +76,8 @@ const MetricsChartPanel = ({ refreshKey }) => {
       {/* AI Failure Prediction Alert Banner */}
       {prediction?.isPredictedViolation && (
         <div style={{
-          background: 'rgba(239, 68, 68, 0.15)',
-          border: '1px solid #ef4444',
+          background: 'rgba(239, 68, 68, 0.12)',
+          border: '1px solid var(--danger)',
           borderRadius: 8,
           padding: '10px 14px',
           marginBottom: 14,
@@ -80,15 +85,17 @@ const MetricsChartPanel = ({ refreshKey }) => {
           display: 'flex',
           alignItems: 'center',
           gap: 10,
+          boxShadow: '0 0 15px rgba(239, 68, 68, 0.15)',
         }}>
           <div style={{
-            backgroundColor: '#ef4444',
+            backgroundColor: 'var(--danger)',
             color: '#fff',
-            fontSize: '11px',
+            fontSize: '10px',
             fontWeight: 800,
             padding: '2px 6px',
             borderRadius: 4,
             textTransform: 'uppercase',
+            letterSpacing: '0.04em',
           }}>
             WARNING
           </div>
@@ -96,7 +103,7 @@ const MetricsChartPanel = ({ refreshKey }) => {
             <strong>AI Trend Prediction: Impending SLO Breach Detected</strong>
             <div style={{ color: 'var(--text)', marginTop: 2 }}>{prediction.recommendation}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2 }}>
-              Confidence / Risk Score: {Math.round(prediction.riskScore * 100)}% | Estimated Time to Breach: ~{prediction.estimatedTimeToBreachSec}s
+              Confidence Score: {Math.round(prediction.riskScore * 100)}% | Time to Breach: ~{prediction.estimatedTimeToBreachSec}s
             </div>
           </div>
         </div>
@@ -108,16 +115,16 @@ const MetricsChartPanel = ({ refreshKey }) => {
           <AreaChart data={data} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isBreached ? '#ef4444' : '#6366f1'} stopOpacity={0.6} />
+                <stop offset="5%" stopColor={isBreached ? '#ef4444' : '#6366f1'} stopOpacity={0.5} />
                 <stop offset="95%" stopColor={isBreached ? '#ef4444' : '#6366f1'} stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#232636" />
-            <XAxis dataKey="time" stroke="#8b8fa3" fontSize={11} />
-            <YAxis stroke="#8b8fa3" fontSize={11} domain={[0, 'dataMax + 100']} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
+            <XAxis dataKey="time" stroke="#64748b" fontSize={11} tickLine={false} />
+            <YAxis stroke="#64748b" fontSize={11} domain={[0, 'dataMax + 100']} tickLine={false} />
             <Tooltip
-              contentStyle={{ background: '#12141f', border: '1px solid #232636', borderRadius: 8, fontSize: '12px' }}
-              labelStyle={{ color: '#e8e9ee', fontWeight: 600 }}
+              contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+              labelStyle={{ color: '#f8fafc', fontWeight: 600 }}
             />
             <ReferenceLine
               y={threshold}
@@ -130,7 +137,7 @@ const MetricsChartPanel = ({ refreshKey }) => {
               dataKey="latency"
               name="P95 Latency (ms)"
               stroke={isBreached ? '#ef4444' : '#6366f1'}
-              strokeWidth={2}
+              strokeWidth={2.5}
               fillOpacity={1}
               fill="url(#latencyGradient)"
             />
