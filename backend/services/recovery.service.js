@@ -18,7 +18,7 @@ class RecoveryService {
   /**
    * Validates if a proposed recovery action complies with safety rules.
    */
-  validateSafety({ deploymentName, namespace = 'default', actionType }) {
+  validateSafety({ deploymentName, namespace = 'default', actionType, bypassCooldown = false }) {
     const key = `${namespace}/${deploymentName}`;
     const normalizedAction = actionType.toUpperCase();
 
@@ -34,7 +34,7 @@ class RecoveryService {
 
     // 3. Cooldown check
     const lastExecuted = cooldownTracker.get(key);
-    if (lastExecuted && Date.now() - lastExecuted < COOLDOWN_PERIOD_MS) {
+    if (!bypassCooldown && lastExecuted && Date.now() - lastExecuted < COOLDOWN_PERIOD_MS) {
       const remainingSec = Math.ceil((COOLDOWN_PERIOD_MS - (Date.now() - lastExecuted)) / 1000);
       return { allowed: false, reason: `Safety cooldown active for ${deploymentName}. Please wait ${remainingSec}s before next recovery.` };
     }
@@ -60,13 +60,14 @@ class RecoveryService {
     rootCause = 'Operational anomaly detected',
     reason = 'Automated self-healing triggered by AI DevOps Copilot',
     incidentId = null,
+    bypassCooldown = false,
   }) {
     const startTime = Date.now();
     const key = `${namespace}/${deploymentName}`;
     const normalizedAction = actionType.toUpperCase();
 
     // Validate safety constraints
-    const safety = this.validateSafety({ deploymentName, namespace, actionType });
+    const safety = this.validateSafety({ deploymentName, namespace, actionType, bypassCooldown });
     if (!safety.allowed && normalizedAction !== 'NO ACTION') {
       console.warn(`[Self-Healing Safety] Blocked action on ${deploymentName}: ${safety.reason}`);
       return {

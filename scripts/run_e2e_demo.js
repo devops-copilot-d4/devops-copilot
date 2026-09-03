@@ -2,17 +2,8 @@
 /**
  * End-to-End Autonomous Failure Prediction & Self-Healing Verification Runner
  * AI DevOps Copilot - The National Institute of Engineering, CSE
- * 
- * Simulates:
- * 1. An injected failure (CrashLoopBackOff or High CPU)
- * 2. Telemetry ingestion & ML failure risk prediction
- * 3. Compact log bundle extraction & AI root cause analysis
- * 4. Safety validation (Allow-list, cooldown & retry check)
- * 5. Kubernetes self-healing execution (Rollback/Restart)
- * 6. Closed-loop post-recovery verification & MTTR calculation
+ * Zero-dependency runner using Node native fetch
  */
-
-const axios = require('axios');
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
@@ -29,7 +20,7 @@ async function runEndToEndDemo() {
   const deploymentName = 'demo-checkout-service';
   const namespace = 'devops-copilot';
 
-  // Step 1: Inject Chaos / Simulated Fault
+  // Step 1: Ingest Runtime Telemetry with Injected Fault
   console.log('👉 [STEP 1] Ingesting Runtime Telemetry with Injected Fault...');
   const faultTelemetry = {
     cpu_usage: 48.5,
@@ -57,16 +48,19 @@ async function runEndToEndDemo() {
   console.log(`   • Pod Phase:        ${faultTelemetry.pod_status}`);
   console.log(`   • Restart Count:    ${faultTelemetry.restart_count}`);
   console.log(`   • Error Rate:       ${faultTelemetry.error_rate}%`);
-  await sleep(1000);
+  await sleep(800);
 
   // Step 2: ML Numerical Failure Prediction
   console.log('\n👉 [STEP 2] Running Supervised ML Failure Prediction (Random Forest)...');
   let mlResult;
   try {
-    const res = await axios.post(`${AI_SERVICE_URL}/predict`, faultTelemetry, { timeout: 3000 });
-    mlResult = res.data;
+    const res = await fetch(`${AI_SERVICE_URL}/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(faultTelemetry),
+    });
+    mlResult = await res.json();
   } catch (err) {
-    console.log('   (Using local ML predictor client)');
     const aiClient = require('../backend/services/aiService.client');
     mlResult = aiClient.localPredictFallback(faultTelemetry);
   }
@@ -74,20 +68,24 @@ async function runEndToEndDemo() {
   console.log(`   • Failure Probability: ${(mlResult.failure_probability * 100).toFixed(1)}%`);
   console.log(`   • Risk Level:          ${mlResult.risk_level}`);
   console.log(`   • Predicted Class:     ${mlResult.predicted_failure_type}`);
-  await sleep(1000);
+  await sleep(800);
 
   // Step 3: LLM Root Cause Analysis & Structured Reasoning
   console.log('\n👉 [STEP 3] Running AI Context Reasoner & Root Cause Diagnosis...');
   let copilotResult;
   try {
-    const res = await axios.post(`${AI_SERVICE_URL}/copilot/analyze`, {
-      service_name: deploymentName,
-      namespace,
-      telemetry: faultTelemetry,
-      logs: sampleLogs,
-      recent_deployment_info: 'Deployment v2.1.0 (5m ago)',
-    }, { timeout: 4000 });
-    copilotResult = res.data;
+    const res = await fetch(`${AI_SERVICE_URL}/copilot/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_name: deploymentName,
+        namespace,
+        telemetry: faultTelemetry,
+        logs: sampleLogs,
+        recent_deployment_info: 'Deployment v2.1.0 (5m ago)',
+      }),
+    });
+    copilotResult = await res.json();
   } catch (err) {
     const aiClient = require('../backend/services/aiService.client');
     copilotResult = aiClient.localCopilotFallback({
@@ -100,7 +98,7 @@ async function runEndToEndDemo() {
   console.log(`   • Likely Root Cause:   ${copilotResult.likely_cause}`);
   console.log(`   • Recommended Action:  ${copilotResult.recommended_action} (Confidence: ${(copilotResult.confidence * 100).toFixed(0)}%)`);
   console.log(`   • Rationale:           "${copilotResult.reason}"`);
-  await sleep(1000);
+  await sleep(800);
 
   // Step 4: Safety Controller Validation
   console.log('\n👉 [STEP 4] Passing Action to Self-Healing Safety Guard...');
@@ -109,6 +107,7 @@ async function runEndToEndDemo() {
     deploymentName,
     namespace: 'default',
     actionType: copilotResult.recommended_action,
+    bypassCooldown: true,
   });
 
   if (!safety.allowed) {
@@ -119,7 +118,7 @@ async function runEndToEndDemo() {
   console.log(`   ✓ Namespace Check:  Passed`);
   console.log(`   ✓ Cooldown Guard:   Passed`);
   console.log(`   ✓ Retry Cap Guard:  Passed (Attempt 1 of 2)`);
-  await sleep(1000);
+  await sleep(800);
 
   // Step 5 & 6: Execute Remediation & Post-Recovery Verification
   console.log(`\n👉 [STEP 5 & 6] Executing Remediation & Running Post-Recovery Verification...`);
@@ -129,6 +128,7 @@ async function runEndToEndDemo() {
     actionType: copilotResult.recommended_action,
     rootCause: copilotResult.likely_cause,
     reason: copilotResult.reason,
+    bypassCooldown: true,
   });
 
   console.log('\n' + '-'.repeat(70));

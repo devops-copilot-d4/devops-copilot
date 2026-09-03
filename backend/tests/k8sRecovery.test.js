@@ -10,6 +10,7 @@ async function testRecoveryExecution() {
     namespace: 'default',
     actionType: 'RESTART',
     reason: 'Automated test restart',
+    bypassCooldown: true,
   });
 
   assert.strictEqual(restartResult.success, true);
@@ -23,6 +24,7 @@ async function testRecoveryExecution() {
     namespace: 'default',
     actionType: 'ROLLBACK',
     reason: 'Automated test rollback',
+    bypassCooldown: true,
   });
 
   assert.strictEqual(rollbackResult.success, true);

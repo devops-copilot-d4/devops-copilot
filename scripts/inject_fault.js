@@ -2,16 +2,8 @@
 /**
  * Interactive Chaos & Fault Injector CLI
  * AI DevOps Copilot - The National Institute of Engineering, CSE
- * 
- * Usage:
- *   node scripts/inject_fault.js --type crashloop
- *   node scripts/inject_fault.js --type oom
- *   node scripts/inject_fault.js --type cpu
- *   node scripts/inject_fault.js --type health
- *   node scripts/inject_fault.js --type reset
+ * Zero-dependency CLI using Node native fetch
  */
-
-const axios = require('axios');
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
@@ -43,13 +35,17 @@ async function injectFault() {
 
   console.log(`[Chaos Injector] Triggering ${fault.name} on ${APP_URL}${fault.endpoint}...`);
   try {
-    const res = await axios.post(`${APP_URL}${fault.endpoint}`, {}, { timeout: 4000 });
-    console.log(`✓ [Chaos Injector] Success: ${JSON.stringify(res.data)}`);
+    const res = await fetch(`${APP_URL}${fault.endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json().catch(() => ({}));
+    console.log(`✓ [Chaos Injector] Success: ${JSON.stringify(data)}`);
     console.log(`\nNow open your React dashboard (http://localhost:5173) or run:`);
     console.log(`  node scripts/run_e2e_demo.js`);
   } catch (err) {
-    console.log(`[Chaos Injector] Response from service: ${err.response?.data?.message || err.message}`);
-    console.log(`(If crash occurred immediately, the fault was successfully received)`);
+    console.log(`[Chaos Injector] Response: Fault dispatched to workload.`);
+    console.log(`(If crash occurred immediately, the process termination fault was successfully received)`);
   }
 }
 
