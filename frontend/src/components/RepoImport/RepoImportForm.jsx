@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ServicesAPI, DeploymentsAPI } from '../../api/endpoints';
 
-const RepoImportForm = ({ services = [], onServiceCreated }) => {
+const RepoImportForm = ({ services = [], onServiceCreated, onDeploymentTriggered }) => {
   const [name, setName] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
@@ -31,10 +31,12 @@ const RepoImportForm = ({ services = [], onServiceCreated }) => {
     try {
       const res = await DeploymentsAPI.trigger({ serviceId: selectedServiceId, commitSha });
       setStatus(`Deployment queued: ${res.data._id}`);
+      if (onDeploymentTriggered) onDeploymentTriggered();
     } catch (err) {
       setStatus(`Error: ${err.response?.data?.message || err.message}`);
     }
   };
+
 
   return (
     <div className="panel">

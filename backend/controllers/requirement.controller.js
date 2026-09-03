@@ -1,7 +1,8 @@
-﻿const Requirement = require('../models/Requirement');
+const Requirement = require('../models/Requirement');
 const Metric = require('../models/Metric');
 const SLO = require('../models/SLO');
 const { requirementToSLO } = require('../services/llm.service');
+const { emitEvent } = require('../services/socket.service');
 
 // Create a requirement, then use the LLM to draft an SLO from it automatically
 const createRequirement = async (req, res, next) => {
@@ -38,11 +39,17 @@ const createRequirement = async (req, res, next) => {
       console.error('LLM SLO generation failed:', llmErr.message);
     }
 
+    emitEvent('requirement:new', { requirement, draftSlo });
+    if (draftSlo) {
+      emitEvent('slo:update', { sloId: draftSlo._id, status: draftSlo.status });
+    }
+
     res.status(201).json({ requirement, draftSlo });
   } catch (err) {
     next(err);
   }
 };
+
 
 const getRequirements = async (req, res, next) => {
   try {

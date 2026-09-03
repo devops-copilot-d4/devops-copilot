@@ -1,14 +1,30 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { io } from 'socket.io-client';
 import { RequirementsAPI } from '../../api/endpoints';
 
-const RequirementTraceabilityView = () => {
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+
+const RequirementTraceabilityView = ({ refreshKey }) => {
   const [requirements, setRequirements] = useState([]);
 
-  useEffect(() => {
+  const loadRequirements = useCallback(() => {
     RequirementsAPI.list()
       .then((res) => setRequirements(res.data))
       .catch(() => setRequirements([]));
   }, []);
+
+  useEffect(() => {
+    loadRequirements();
+
+    const socket = io(SOCKET_URL);
+    socket.on('requirement:new', () => {
+      loadRequirements();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [loadRequirements, refreshKey]);
 
   return (
     <div className="panel">
@@ -17,7 +33,7 @@ const RequirementTraceabilityView = () => {
       <ul>
         {requirements.map((r) => (
           <li key={r._id}>
-            "{r.text}" -&gt; service: {r.service?.name || 'unlinked'}
+            "{r.text}" -&gt; service: <strong>{r.service?.name || 'unlinked'}</strong>
           </li>
         ))}
       </ul>
@@ -26,4 +42,5 @@ const RequirementTraceabilityView = () => {
 };
 
 export default RequirementTraceabilityView;
+
 
