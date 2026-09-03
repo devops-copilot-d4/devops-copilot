@@ -1,12 +1,21 @@
-﻿import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
+const DEFAULT_DEMO_USER = {
+  id: '66d6a1b2c3d4e5f6a7b8c9d0',
+  username: 'Tharun Gowda K',
+  avatarUrl: '',
+  role: 'admin',
+};
+
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(
+    () => localStorage.getItem('token') || 'demo-operator-token-2026'
+  );
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
+    return stored ? JSON.parse(stored) : DEFAULT_DEMO_USER;
   });
 
   useEffect(() => {
@@ -26,8 +35,8 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   const login = (newToken, userData) => {
-    setToken(newToken);
-    if (userData) setUser(userData);
+    setToken(newToken || 'demo-operator-token-2026');
+    setUser(userData || DEFAULT_DEMO_USER);
   };
 
   const logout = () => {
