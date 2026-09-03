@@ -1,3 +1,4 @@
+const axios = require('axios');
 const Service = require('../models/Service');
 const SLO = require('../models/SLO');
 const Incident = require('../models/Incident');
@@ -126,6 +127,10 @@ const triggerChaosSpike = async (req, res, next) => {
       deploymentName: service.deploymentName || 'demo-checkout-service',
       namespace: service.namespace || 'default',
     });
+
+    // Notify physical container instance if reachable
+    const demoUrl = process.env.DEMO_APP_URL || 'http://demo-app:3000';
+    axios.post(`${demoUrl}/fault/crash`).catch(() => {});
 
     emitEvent('slo:update', { sloId: slo._id, status: 'violated', value: 680 });
     emitEvent('metrics:update', { metrics: metricStream });

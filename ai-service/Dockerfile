@@ -11,6 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Train the Random Forest model and serialize model.joblib in /app/ml
+RUN python ml/train.py
+
+# Create symlink /ml -> /app/ml for compatibility
+RUN ln -s /app/ml /ml
+
 EXPOSE 8000
 
 CMD ["python", "main.py"]
