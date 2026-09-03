@@ -95,6 +95,8 @@ const rollbackDeployment = async ({ deploymentName, namespace = 'default' }) => 
     ...pod,
     name: generatePodName(deploymentName),
     status: 'Running',
+    ready: '1/1',
+    restarts: 0,
     age: '20s',
     cpu: '22m',
     memory: '120Mi',
@@ -140,6 +142,7 @@ const injectPodFailure = async ({ deploymentName = 'demo-checkout-service', name
   if (currentPods.length > 0) {
     currentPods[0].status = 'CrashLoopBackOff';
     currentPods[0].ready = '0/1';
+    currentPods[0].restarts = 6;
     currentPods[0].cpu = '580m';
     currentPods[0].memory = '490Mi';
   }
