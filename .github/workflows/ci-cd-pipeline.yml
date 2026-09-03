@@ -53,8 +53,8 @@ jobs:
       # 3. Validate Kubernetes Manifests
       - name: Validate Kubernetes Manifests
         run: |
-          kubectl create --dry-run=client -f k8s/rbac.yaml
-          kubectl create --dry-run=client -f k8s/app-deployment.yaml
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar -xz -C /tmp
+          /tmp/kubeconform -summary -strict k8s/rbac.yaml k8s/app-deployment.yaml
 
   # -------------------------------------------------------------
   # JOB 2: Build and Package Container Images
