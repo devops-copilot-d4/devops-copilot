@@ -73,28 +73,36 @@ const DashboardPage = () => {
           className={`nav-tab ${activeTab === 'overview' ? 'nav-tab--active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
-          <span className="nav-tab__icon">📊</span>
+          <span className="nav-tab__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          </span>
           <span>Overview &amp; Telemetry</span>
         </button>
         <button
           className={`nav-tab ${activeTab === 'traceability' ? 'nav-tab--active' : ''}`}
           onClick={() => setActiveTab('traceability')}
         >
-          <span className="nav-tab__icon">🔗</span>
+          <span className="nav-tab__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </span>
           <span>Requirement Traceability</span>
         </button>
         <button
           className={`nav-tab ${activeTab === 'kubernetes' ? 'nav-tab--active' : ''}`}
           onClick={() => setActiveTab('kubernetes')}
         >
-          <span className="nav-tab__icon">☸️</span>
+          <span className="nav-tab__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          </span>
           <span>Kubernetes Topology</span>
         </button>
         <button
           className={`nav-tab ${activeTab === 'settings' ? 'nav-tab--active' : ''}`}
           onClick={() => setActiveTab('settings')}
         >
-          <span className="nav-tab__icon">⚙️</span>
+          <span className="nav-tab__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
           <span>Cluster Settings &amp; AI Policies</span>
         </button>
       </nav>
@@ -124,8 +132,7 @@ const DashboardPage = () => {
               fontWeight: 700,
             }}
           >
-            <span>⚡</span>
-            {isSimulating ? 'Healing in Progress...' : 'Trigger Chaos / SLO Breach Demo'}
+            <span>Trigger Chaos &amp; Self-Healing Demo</span>
           </button>
         </div>
 
@@ -143,7 +150,6 @@ const DashboardPage = () => {
             gap: 12,
             boxShadow: '0 0 15px rgba(99, 102, 241, 0.15)',
           }}>
-            <span style={{ fontSize: '18px' }}>🤖</span>
             <span>{simMessage}</span>
           </div>
         )}
@@ -153,7 +159,9 @@ const DashboardPage = () => {
           <div className="kpi-card">
             <div className="kpi-card__top">
               <span className="kpi-card__title">Managed Services</span>
-              <span className="kpi-card__icon">📦</span>
+              <span className="kpi-card__icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+              </span>
             </div>
             <div className="kpi-card__value">{services.length || 2}</div>
             <div className="kpi-card__subtitle">Cloud-native microservices active</div>
@@ -162,7 +170,9 @@ const DashboardPage = () => {
           <div className="kpi-card">
             <div className="kpi-card__top">
               <span className="kpi-card__title">SLO Compliance</span>
-              <span className="kpi-card__icon">🎯</span>
+              <span className="kpi-card__icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+              </span>
             </div>
             <div className="kpi-card__value" style={{ color: complianceRate >= 99 ? 'var(--success)' : 'var(--warning)' }}>
               {complianceRate}%
@@ -173,7 +183,9 @@ const DashboardPage = () => {
           <div className="kpi-card">
             <div className="kpi-card__top">
               <span className="kpi-card__title">Autonomous MTTR</span>
-              <span className="kpi-card__icon">⚡</span>
+              <span className="kpi-card__icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </span>
             </div>
             <div className="kpi-card__value" style={{ color: 'var(--cyan)' }}>&lt; 2.4s</div>
             <div className="kpi-card__subtitle">AI Root Cause Diagnosis &amp; Remediation</div>
@@ -182,7 +194,9 @@ const DashboardPage = () => {
           <div className="kpi-card">
             <div className="kpi-card__top">
               <span className="kpi-card__title">Kubernetes Health</span>
-              <span className="kpi-card__icon">☸️</span>
+              <span className="kpi-card__icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              </span>
             </div>
             <div className="kpi-card__value" style={{ color: 'var(--success)' }}>100%</div>
             <div className="kpi-card__subtitle">Pod replicas healthy &amp; ready</div>
@@ -240,8 +254,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-
-
-
-
-

@@ -51,13 +51,16 @@ const AIInsightsPanel = () => {
   return (
     <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0 }}>🤖 AI DevOps Copilot (Hybrid ML + LLM)</h3>
+        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>AI DevOps Copilot Analysis</span>
+        </h3>
         <button
           onClick={fetchDiagnosis}
           disabled={loading}
           style={{
             padding: '6px 12px',
-            fontSize: '13px',
+            fontSize: '12px',
+            fontWeight: 600,
             cursor: 'pointer',
             backgroundColor: '#2563eb',
             color: '#fff',
@@ -80,25 +83,26 @@ const AIInsightsPanel = () => {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', color: '#94a3b8' }}>ML Failure Probability</span>
+            <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>ML Failure Probability</span>
             <span
               style={{
                 backgroundColor: getRiskColor(prediction.risk),
                 color: '#fff',
                 padding: '2px 8px',
                 borderRadius: 4,
-                fontSize: '12px',
-                fontWeight: 'bold',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.04em',
               }}
             >
               {prediction.risk} RISK
             </span>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', margin: '8px 0', color: '#f8fafc' }}>
+          <div style={{ fontSize: '24px', fontWeight: 800, margin: '8px 0', color: '#f8fafc' }}>
             {(prediction.probability * 100).toFixed(1)}%
           </div>
-          <div style={{ fontSize: '13px', color: '#cbd5e1' }}>
-            Predicted Scenario: <strong>{prediction.failure_type}</strong>
+          <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
+            Predicted Classification: <strong>{prediction.failure_type}</strong>
           </div>
         </div>
       )}
@@ -113,15 +117,15 @@ const AIInsightsPanel = () => {
             border: '1px solid #334155',
           }}
         >
-          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#38bdf8', marginBottom: 8 }}>
-            📋 Root Cause Analysis &amp; Decision Support
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+            Root Cause Diagnosis &amp; Decision Support
           </div>
           <p style={{ margin: '4px 0', fontSize: '13px', color: '#e2e8f0' }}>
-            <strong>Likely Cause:</strong> {copilotDiagnosis.likely_cause}
+            <strong>Likely Root Cause:</strong> {copilotDiagnosis.likely_cause}
           </p>
           <p style={{ margin: '4px 0', fontSize: '13px', color: '#e2e8f0' }}>
             <strong>Recommended Action:</strong>{' '}
-            <span style={{ color: '#a855f7', fontWeight: 'bold' }}>{copilotDiagnosis.recommended_action}</span> (Confidence: {(copilotDiagnosis.confidence * 100).toFixed(0)}%)
+            <span style={{ color: '#a855f7', fontWeight: 700 }}>{copilotDiagnosis.recommended_action}</span> (Confidence: {(copilotDiagnosis.confidence * 100).toFixed(0)}%)
           </p>
           <p style={{ margin: '4px 0', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
             &ldquo;{copilotDiagnosis.reason}&rdquo;
@@ -131,14 +135,14 @@ const AIInsightsPanel = () => {
 
       {/* Incident History List */}
       <div>
-        <h4 style={{ margin: '8px 0 6px 0', fontSize: '14px' }}>Recent Incidents</h4>
+        <h4 style={{ margin: '8px 0 6px 0', fontSize: '13px', color: '#cbd5e1', fontWeight: 600 }}>Recent Incidents</h4>
         {incidents.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#94a3b8' }}>No unresolved incidents detected.</p>
+          <p style={{ fontSize: '12px', color: '#94a3b8' }}>No unresolved incidents detected.</p>
         ) : (
-          <ul style={{ paddingLeft: 16, margin: 0, fontSize: '13px' }}>
+          <ul style={{ paddingLeft: 16, margin: 0, fontSize: '12px', color: '#cbd5e1' }}>
             {incidents.map((i) => (
               <li key={i._id} style={{ marginBottom: 4 }}>
-                [{i.severity || 'INFO'}] {i.service?.name || 'checkout'}: {i.rootCause}
+                [{i.severity ? i.severity.toUpperCase() : 'INFO'}] {i.service?.name || 'checkout'}: {i.rootCause}
               </li>
             ))}
           </ul>

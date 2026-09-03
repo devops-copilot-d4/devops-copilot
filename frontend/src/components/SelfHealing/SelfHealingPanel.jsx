@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { RecoveryAPI } from '../../api/endpoints';
-import ExplainabilityCard from '../Explainability/ExplainabilityCard';
 
 const SelfHealingPanel = () => {
   const [actions, setActions] = useState([]);
@@ -25,7 +24,7 @@ const SelfHealingPanel = () => {
         deploymentName: 'demo-checkout-service',
         namespace: 'default',
         actionType,
-        reason: `Manually triggered ${actionType} self-healing remediation from dashboard.`,
+        reason: `Triggered ${actionType} self-healing remediation from dashboard.`,
         rootCause: 'Operator chaos experiment or detected degradation',
       });
       setLastResult(res.data);
@@ -50,12 +49,14 @@ const SelfHealingPanel = () => {
   return (
     <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0 }}>🛡️ Self-Healing Controller &amp; Safety Layer</h3>
+        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Self-Healing Controller &amp; Safety Layer</span>
+        </h3>
       </div>
 
       {/* Manual Demo Remediation Triggers */}
       <div style={{ backgroundColor: '#1e293b', padding: 12, borderRadius: 8 }}>
-        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#94a3b8', marginBottom: 8 }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
           Controlled Remediation (Allow-List Protected)
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -70,7 +71,7 @@ const SelfHealingPanel = () => {
               borderRadius: 4,
               cursor: 'pointer',
               fontSize: '12px',
-              fontWeight: 'bold',
+              fontWeight: 600,
             }}
           >
             Rollback Deployment
@@ -86,7 +87,7 @@ const SelfHealingPanel = () => {
               borderRadius: 4,
               cursor: 'pointer',
               fontSize: '12px',
-              fontWeight: 'bold',
+              fontWeight: 600,
             }}
           >
             Rolling Restart
@@ -102,7 +103,7 @@ const SelfHealingPanel = () => {
               borderRadius: 4,
               cursor: 'pointer',
               fontSize: '12px',
-              fontWeight: 'bold',
+              fontWeight: 600,
             }}
           >
             Scale Replicas (HPA)
@@ -134,9 +135,9 @@ const SelfHealingPanel = () => {
 
       {/* Recovery History */}
       <div>
-        <h4 style={{ margin: '8px 0 6px 0', fontSize: '14px' }}>Remediation &amp; Verification History</h4>
+        <h4 style={{ margin: '8px 0 6px 0', fontSize: '13px', color: '#cbd5e1', fontWeight: 600 }}>Remediation &amp; Verification History</h4>
         {actions.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#94a3b8' }}>No recovery actions executed yet.</p>
+          <p style={{ fontSize: '12px', color: '#94a3b8' }}>No recovery actions executed yet.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {actions.slice(0, 5).map((a) => (
@@ -147,7 +148,7 @@ const SelfHealingPanel = () => {
                   padding: 10,
                   borderRadius: 6,
                   border: '1px solid #334155',
-                  fontSize: '13px',
+                  fontSize: '12px',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -158,10 +159,10 @@ const SelfHealingPanel = () => {
                   <span
                     style={{
                       color: a.status === 'success' ? '#22c55e' : a.status === 'failed' ? '#ef4444' : '#f59e0b',
-                      fontWeight: 'bold',
+                      fontWeight: 700,
                     }}
                   >
-                    {a.status === 'success' ? '✓ RECOVERY SUCCESSFUL' : a.status}
+                    {a.status === 'success' ? 'RECOVERY SUCCESSFUL' : a.status}
                   </span>
                 </div>
                 {a.requiresApproval && a.status === 'pending_approval' && (

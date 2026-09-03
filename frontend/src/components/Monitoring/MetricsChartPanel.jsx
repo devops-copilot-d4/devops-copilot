@@ -81,9 +81,19 @@ const MetricsChartPanel = ({ refreshKey }) => {
           alignItems: 'center',
           gap: 10,
         }}>
-          <span style={{ fontSize: '18px' }}>⚠️</span>
+          <div style={{
+            backgroundColor: '#ef4444',
+            color: '#fff',
+            fontSize: '11px',
+            fontWeight: 800,
+            padding: '2px 6px',
+            borderRadius: 4,
+            textTransform: 'uppercase',
+          }}>
+            WARNING
+          </div>
           <div>
-            <strong>AI Trend Prediction: Impending SLO Breach Detected!</strong>
+            <strong>AI Trend Prediction: Impending SLO Breach Detected</strong>
             <div style={{ color: 'var(--text)', marginTop: 2 }}>{prediction.recommendation}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2 }}>
               Confidence / Risk Score: {Math.round(prediction.riskScore * 100)}% | Estimated Time to Breach: ~{prediction.estimatedTimeToBreachSec}s

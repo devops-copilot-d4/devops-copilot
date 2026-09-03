@@ -11,7 +11,7 @@ const SettingsPanel = () => {
 
   const handleSave = (e) => {
     e.preventDefault();
-    setSaveStatus('Cluster configuration & AI policies updated successfully!');
+    setSaveStatus('Cluster configuration and AI policies updated successfully.');
     setTimeout(() => setSaveStatus(null), 4000);
   };
 
@@ -19,7 +19,7 @@ const SettingsPanel = () => {
     <div className="settings-grid">
       {/* AI & LLM Engine Settings */}
       <div className="settings-card">
-        <h3>🧠 AI &amp; Inference Engine Configuration</h3>
+        <h3>AI &amp; Inference Engine Configuration</h3>
         <p>Configure the foundational LLM orchestrating Requirement Translation, RCA, and Explainability.</p>
         
         <div className="settings-row">
@@ -52,14 +52,14 @@ const SettingsPanel = () => {
             onClick={() => setAutonomousHealing(!autonomousHealing)}
             style={{ fontSize: '12px', padding: '6px 12px' }}
           >
-            {autonomousHealing ? '🟢 Autonomous' : '🟡 Approval Gated'}
+            {autonomousHealing ? 'Autonomous' : 'Approval Gated'}
           </button>
         </div>
       </div>
 
       {/* Kubernetes & Resilience Policy */}
       <div className="settings-card">
-        <h3>☸️ Kubernetes Self-Healing Policies</h3>
+        <h3>Kubernetes Self-Healing Policies</h3>
         <p>Control container orchestration, rolling restart limits, and post-recovery rollbacks.</p>
 
         <div className="settings-row">
@@ -88,7 +88,7 @@ const SettingsPanel = () => {
 
       {/* Telemetry & Metrics Scraper */}
       <div className="settings-card">
-        <h3>📊 Telemetry &amp; Prometheus Gateway</h3>
+        <h3>Telemetry &amp; Prometheus Gateway</h3>
         <p>Telemetry endpoints for collecting raw time-series metrics.</p>
 
         <div className="settings-row">
@@ -120,7 +120,7 @@ const SettingsPanel = () => {
 
       {/* Alerts & Webhooks */}
       <div className="settings-card">
-        <h3>🔔 Alert Notifications &amp; Webhooks</h3>
+        <h3>Alert Notifications &amp; Webhooks</h3>
         <p>Broadcast SLO breach and self-healing action summaries to team channels.</p>
 
         <div className="settings-row">
@@ -139,7 +139,7 @@ const SettingsPanel = () => {
             Save All Policies
           </button>
         </div>
-        {saveStatus && <p style={{ color: 'var(--success)', fontSize: '13px', margin: 0 }}>✓ {saveStatus}</p>}
+        {saveStatus && <p style={{ color: 'var(--success)', fontSize: '13px', margin: 0 }}>{saveStatus}</p>}
       </div>
     </div>
   );

@@ -18,12 +18,18 @@ const Header = () => {
     <header className="app-header">
       <div className="app-header__left">
         <div className="app-header__brand">
-          <div className="app-header__logo-icon">🤖</div>
-          <span>AI DevOps Copilot</span>
+          <div className="app-header__logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <span style={{ fontWeight: 700, letterSpacing: '-0.02em', fontSize: '16px' }}>AI DevOps Copilot</span>
         </div>
-        <div className="app-header__badge">
-          <span className="app-header__pulse-dot" />
-          <span>K8s Self-Healing Controller: Active</span>
+        <div className="app-header__badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399' }}>
+          <span className="app-header__pulse-dot" style={{ backgroundColor: '#10b981' }} />
+          <span style={{ fontSize: '12px', fontWeight: 600 }}>Autonomous Controller: Active</span>
         </div>
       </div>
 
@@ -50,4 +56,4 @@ const Header = () => {
   );
 };
 
-export default Header;
+export default Header;
