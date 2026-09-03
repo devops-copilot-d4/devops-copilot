@@ -82,7 +82,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./k8s/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus.yml
+      - ./k8s/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - copilot-net
 
