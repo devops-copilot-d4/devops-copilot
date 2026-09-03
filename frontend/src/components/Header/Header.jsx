@@ -115,7 +115,7 @@ const Header = ({ onRefresh, onTriggerDeploy, onOpenAICopilot, onOpenSettings })
     return () => {
       socket.disconnect();
     };
-  }, [refreshHeaderData]);
+  }, []);
 
   // Sync elapsed timer ticker
   useEffect(() => {

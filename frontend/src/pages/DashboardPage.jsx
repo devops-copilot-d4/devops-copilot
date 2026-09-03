@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ServicesAPI, SimulationAPI, MonitoringAPI } from '../api/endpoints';
+import { ServicesAPI, SimulationAPI, MonitoringAPI, RecoveryAPI } from '../api/endpoints';
 import Sidebar from '../components/Sidebar/Sidebar';
 import Header from '../components/Header/Header';
 import AIInsightsPanel from '../components/AIInsights/AIInsightsPanel';
