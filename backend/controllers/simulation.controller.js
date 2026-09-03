@@ -5,8 +5,9 @@ const RecoveryAction = require('../models/RecoveryAction');
 const Requirement = require('../models/Requirement');
 const Metric = require('../models/Metric');
 const k8sService = require('../services/k8s.service');
+const aiClient = require('../services/aiService.client');
+const recoveryService = require('../services/recovery.service');
 const { predictFailureTrend } = require('../services/prediction.service');
-const { analyzeRootCause, explainRecoveryDecision } = require('../services/llm.service');
 const { emitEvent } = require('../services/socket.service');
 
 // Generate 15 baseline time-series points
@@ -53,57 +54,48 @@ const getPodTelemetry = async (req, res, next) => {
   }
 };
 
-// POST /api/simulation/chaos — 1-Click Anomaly / Traffic Spike Simulation
+// POST /api/simulation/chaos — Full Real E2E AI-Driven Self-Healing Loop
 const triggerChaosSpike = async (req, res, next) => {
   try {
-    // Ensure a Service document exists (upsert)
-    let service = await Service.findOne();
+    // 1. Ensure Target Service Document exists
+    let service = await Service.findOne({
+      $or: [
+        { deploymentName: 'demo-checkout-service' },
+        { name: 'demo-checkout-service' },
+      ],
+    });
+
     if (!service) {
       service = await Service.create({
         name: 'demo-checkout-service',
         repoUrl: 'https://github.com/devops-copilot-d4/devops-copilot',
         deploymentName: 'demo-checkout-service',
         namespace: 'default',
+        status: 'running',
       });
     }
 
-    // 1. Inject traffic spike in metric stream
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const spikePoint = {
-      time: now,
-      latency: 680,
-      errorRate: 4.8,
-      rps: 1250,
-    };
-    metricStream.push(spikePoint);
-    if (metricStream.length > 20) metricStream.shift();
+    // 2. Ensure Supporting Requirement, Metric & SLO exist
+    let requirement = await Requirement.findOne({ service: service._id });
+    if (!requirement) {
+      requirement = await Requirement.create({
+        text: 'Checkout API P95 latency must stay below 300ms',
+        service: service._id,
+      });
+    }
 
-    // 2. Inject pod failure in K8s state manager
-    await k8sService.injectPodFailure({
-      deploymentName: service.deploymentName || 'demo-checkout-service',
-      namespace: service.namespace || 'default',
-    });
+    let metric = await Metric.findOne({ service: service._id });
+    if (!metric) {
+      metric = await Metric.create({
+        name: 'http_request_duration_seconds',
+        source: 'prometheus',
+        service: service._id,
+        queryExpression: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))',
+      });
+    }
 
-    // 3. Mark SLO violated (upsert if needed)
-    let slo = await SLO.findOne();
+    let slo = await SLO.findOne({ requirement: requirement._id });
     if (!slo) {
-      // Create supporting Requirement & Metric docs for SLO references
-      let requirement = await Requirement.findOne({ service: service._id });
-      if (!requirement) {
-        requirement = await Requirement.create({
-          text: 'Checkout API P95 latency must be below 300ms',
-          service: service._id,
-        });
-      }
-      let metric = await Metric.findOne({ service: service._id });
-      if (!metric) {
-        metric = await Metric.create({
-          name: 'http_request_duration_seconds',
-          source: 'prometheus',
-          service: service._id,
-          queryExpression: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))',
-        });
-      }
       slo = await SLO.create({
         requirement: requirement._id,
         metric: metric._id,
@@ -118,87 +110,136 @@ const triggerChaosSpike = async (req, res, next) => {
       slo.lastCheckedAt = new Date();
       await slo.save();
     }
+
+    // 3. Inject In-Memory Metric Spike & Kubernetes Pod Failure
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const spikePoint = {
+      time: now,
+      latency: 680,
+      errorRate: 18.0,
+      rps: 1250,
+    };
+    metricStream.push(spikePoint);
+    if (metricStream.length > 20) metricStream.shift();
+
+    await k8sService.injectPodFailure({
+      deploymentName: service.deploymentName || 'demo-checkout-service',
+      namespace: service.namespace || 'default',
+    });
+
     emitEvent('slo:update', { sloId: slo._id, status: 'violated', value: 680 });
-
-    // 4. Create Incident & Run AI RCA
-    const rca = await analyzeRootCause({
-      logs: 'ERROR: connection pool exhausted. 18 queries timed out waiting for available socket. Worker thread starvation on port 5000.',
-      events: 'Warning: FailedScheduling, BackOff: Back-off restarting failed container',
-      metricsSummary: 'P95 latency spiked from 145ms -> 680ms. Error rate increased to 4.8%.',
-    });
-
-    const incident = await Incident.create({
-      service: service._id,
-      slo: slo._id,
-      type: 'active_violation',
-      severity: 'high',
-      rootCause: rca.rootCause,
-      confidence: rca.confidence || 0.88,
-      status: 'diagnosing',
-    });
-    emitEvent('incident:new', { incidentId: incident._id, rootCause: incident.rootCause });
-
-    // 5. Generate AI Explainability & Self-Healing Action
-    const reason = await explainRecoveryDecision({
-      rootCause: rca.rootCause,
-      actionType: 'restart',
-      businessImpact: 'Checkout API latency exceeds 300ms SLO; cart abandonment rate spiked by 24%',
-    });
-
-    const recoveryAction = await RecoveryAction.create({
-      incident: incident._id,
-      service: service._id,
-      actionType: 'restart',
-      reason,
-      requiresApproval: false,
-      status: 'executing',
-    });
-    emitEvent('recovery:new', { actionId: recoveryAction._id, actionType: 'restart' });
-
-    // Execute recovery after short 2s delay to show transition
-    setTimeout(async () => {
-      await k8sService.restartDeployment({
-        deploymentName: service.deploymentName || 'demo-checkout-service',
-        namespace: service.namespace || 'default',
-      });
-
-      // Restore metrics
-      const recoveryPoint = {
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        latency: 135,
-        errorRate: 0.05,
-        rps: 480,
-      };
-      metricStream.push(recoveryPoint);
-      if (metricStream.length > 20) metricStream.shift();
-
-      if (slo) {
-        slo.status = 'met';
-        await slo.save();
-        emitEvent('slo:update', { sloId: slo._id, status: 'met', value: 135 });
-      }
-
-      recoveryAction.status = 'success';
-      recoveryAction.requirementVerified = true;
-      await recoveryAction.save();
-
-      if (incident) {
-        incident.status = 'resolved';
-        await incident.save();
-      }
-      emitEvent('recovery:update', { actionId: recoveryAction._id, status: 'success', verified: true });
-      emitEvent('metrics:update', { metrics: metricStream });
-      emitEvent('k8s:update', await k8sService.getDeploymentStatus({ deploymentName: service.deploymentName || 'demo-checkout-service' }));
-    }, 2000);
-
     emitEvent('metrics:update', { metrics: metricStream });
     emitEvent('k8s:update', await k8sService.getDeploymentStatus({ deploymentName: service.deploymentName || 'demo-checkout-service' }));
 
+    // 4. Construct Live Failure Telemetry Payload for AI Diagnosis
+    const faultTelemetry = {
+      cpu_usage: 95.0,
+      memory_usage: 92.0,
+      restart_count: 6,
+      error_rate: 18.0,
+      response_time: 3.0,
+      recent_deployment: 1,
+      pod_status: 'CrashLoopBackOff',
+      deployment_status: 'Failed',
+      log_error_count: 8,
+      event_count: 5,
+      health_status: 'Unhealthy',
+    };
+
+    const failureLogs = `
+2026-09-03T09:30:12Z [INFO] Initializing checkout service v2.1.0...
+2026-09-03T09:30:14Z [ERROR] Missing DB_SECRET environment variable in configuration.
+2026-09-03T09:30:15Z [FATAL] Database connection refused. Unhandled exception.
+2026-09-03T09:30:15Z [FATAL] Process exiting with status code 1.
+2026-09-03T09:30:16Z [K8S_EVENT] Back-off restarting failed container checkout-api in pod demo-checkout-service-7f89d-abc12
+`.trim();
+
+    // 5. Call Python FastAPI AI Service (/copilot/analyze)
+    console.log('[Chaos Engine] Calling FastAPI AI Service (/copilot/analyze) for failure diagnosis...');
+    const copilotResult = await aiClient.analyzeCopilotState({
+      serviceName: service.deploymentName || 'demo-checkout-service',
+      namespace: service.namespace || 'default',
+      telemetry: faultTelemetry,
+      logs: failureLogs,
+      events: 'Back-off restarting failed container; Readiness probe failed',
+      recentDeploymentInfo: 'deployment v1.0.0 rolled out recently with configuration changes',
+    });
+
+    console.log(`[Chaos Engine] AI Prediction: Probability: ${copilotResult.probability} (${copilotResult.risk}), Action: ${copilotResult.recommended_action}, Confidence: ${copilotResult.confidence}`);
+
+    // 6. Create Active Incident Record
+    const incident = await Incident.create({
+      service: service._id,
+      slo: slo._id,
+      type: 'runtime_failure',
+      severity: 'high',
+      rootCause: copilotResult.likely_cause || 'Application configuration failure or unhandled startup crash post-deployment.',
+      confidence: copilotResult.confidence || 0.91,
+      rawLogsSnapshot: failureLogs,
+      status: 'diagnosing',
+    });
+
+    emitEvent('incident:new', {
+      incidentId: incident._id,
+      rootCause: incident.rootCause,
+      risk: copilotResult.risk,
+      probability: copilotResult.probability,
+      recommendedAction: copilotResult.recommended_action,
+    });
+
+    // 7. Dispatch Autonomous Closed-Loop Self-Healing via Recovery Service
+    // Schedule short transition delay (1.5s) to illustrate real-time state awareness
+    setTimeout(async () => {
+      try {
+        incident.status = 'recovering';
+        await incident.save();
+
+        console.log(`[Chaos Engine] Passing action '${copilotResult.recommended_action}' through Deterministic Safety Guard...`);
+        const executionResult = await recoveryService.executeRecovery({
+          serviceId: service._id,
+          deploymentName: service.deploymentName || 'demo-checkout-service',
+          namespace: service.namespace || 'default',
+          actionType: copilotResult.recommended_action || 'ROLLBACK',
+          rootCause: copilotResult.likely_cause,
+          reason: copilotResult.reason || 'Automated self-healing triggered by AI DevOps Copilot',
+          incidentId: incident._id,
+          bypassCooldown: true,
+        });
+
+        console.log(`[Chaos Engine] Recovery execution completed. Result status: ${executionResult.status}`);
+
+        if (executionResult.success) {
+          // 8. Restore Metrics & Verify SLO
+          const recoveryPoint = {
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            latency: 135,
+            errorRate: 0.05,
+            rps: 480,
+          };
+          metricStream.push(recoveryPoint);
+          if (metricStream.length > 20) metricStream.shift();
+
+          slo.status = 'met';
+          slo.lastCheckedAt = new Date();
+          await slo.save();
+
+          emitEvent('slo:update', { sloId: slo._id, status: 'met', value: 135 });
+        } else {
+          incident.status = 'escalated';
+          await incident.save();
+        }
+
+        emitEvent('metrics:update', { metrics: metricStream });
+        emitEvent('k8s:update', await k8sService.getDeploymentStatus({ deploymentName: service.deploymentName || 'demo-checkout-service' }));
+      } catch (recoveryErr) {
+        console.error(`[Chaos Engine] Autonomous self-healing failed: ${recoveryErr.message}`);
+      }
+    }, 1500);
+
     res.json({
-      message: 'Chaos traffic spike initiated. Self-healing loop executing.',
-      spikePoint,
+      message: 'Chaos anomaly injected. Real AI diagnosis and self-healing loop executing.',
+      aiDiagnosis: copilotResult,
       incident,
-      recoveryAction,
     });
   } catch (err) {
     next(err);

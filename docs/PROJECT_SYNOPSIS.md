@@ -16,18 +16,18 @@
 ---
 
 ## 3. Abstract
-Modern cloud-native software delivery hinges on continuous integration and continuous deployment (CI/CD) pipelines coupled with Kubernetes container orchestration. Despite widespread automation in build and release cycles, incident detection and failure recovery remain predominantly manual, reactive, and error-prone. This project presents the **AI DevOps Copilot**, an autonomous, hybrid AI-powered platform designed to proactively predict deployment and service failures, diagnose root causes from telemetry and logs, execute safety-constrained self-healing actions, and perform closed-loop post-recovery verification.
+Modern cloud-native software delivery hinges on continuous integration and continuous deployment (CI/CD) pipelines coupled with Kubernetes container orchestration. Despite widespread automation in build and release cycles, incident detection and failure recovery remain predominantly reactive and reliant on manual SRE triaging. This project presents the **AI DevOps Copilot**, an integrated predictive and diagnostic DevOps control loop designed to proactively predict deployment and service failures, diagnose root causes from telemetry and logs, execute safety-guarded remediation actions, and perform closed-loop post-recovery verification.
 
-The platform employs a hybrid AI architecture combining supervised Machine Learning (Random Forest) for numerical failure probability estimation with a structured Large Language Model (LLM) reasoning agent for log and event context diagnosis. A dedicated self-healing controller enforces strict allow-lists (`RESTART`, `SCALE`, `ROLLBACK`, `RECREATE`), cooldown guards, and retry limits, eliminating arbitrary shell execution. Experimental evaluation across 6 controlled failure classes demonstrates a failure prediction accuracy of **96.8%**, a **~98% reduction in Mean Time to Recover (MTTR)**, and robust autonomous remediation.
+The platform employs a hybrid AI architecture combining supervised Machine Learning (Random Forest Classifier) for numerical failure probability estimation with a structured Large Language Model (LLM) reasoning agent for log and event context diagnosis. A dedicated self-healing controller enforces deterministic safety guardrails (`ROLLBACK`, `RESTART`, `SCALE_UP`, `SCALE_DOWN`, `RECREATE`), 60-second cooldown guards, and retry limits, eliminating arbitrary shell execution. Experimental evaluation across controlled failure classes demonstrates a failure prediction accuracy of **96.8%**, autonomous closed-loop MTTR of **~0.83s**, and reliable self-healing remediation.
 
 ---
 
 ## 4. Problem Statement & Research Question
 ### Problem Statement:
-Cloud-native microservices deployed on Kubernetes often face transient failures, resource exhaustion, and bad configuration rollouts. Existing monitoring tools (Prometheus/Grafana) report anomalies only *after* service level objectives (SLOs) are breached, requiring manual on-call intervention and prolonged downtime.
+Cloud-native microservices deployed on Kubernetes often face transient failures, resource exhaustion, and faulty configuration rollouts. Existing monitoring tools report anomalies only *after* service level objectives (SLOs) are breached, requiring manual on-call intervention and prolonged downtime.
 
 ### Core Research Question:
-> *“Can an AI agent analyze CI/CD and Kubernetes operational data, predict deployment failures, determine an appropriate recovery action, autonomously execute that recovery, and verify whether the recovery was successful?”*
+> *“Can an integrated predictive and diagnostic AI control loop analyze CI/CD telemetry and Kubernetes operational metrics, predict deployment failures, synthesize appropriate recovery actions, autonomously execute them through deterministic safety guardrails, and verify recovery success?”*
 
 ---
 
@@ -42,20 +42,20 @@ Cloud-native microservices deployed on Kubernetes often face transient failures,
 ---
 
 ## 6. Technology Stack
-- **Frontend:** React.js, Tailwind CSS
-- **Backend:** Node.js, Express.js
+- **Frontend:** React 18, Vite, Recharts, Socket.IO Client, Custom Dark Observability CSS
+- **Backend:** Node.js, Express.js, Socket.IO, Mongoose
 - **Database:** MongoDB
-- **CI/CD:** Jenkins (8-Stage Declarative Pipeline), Git, GitHub
-- **Containerization & Orchestration:** Docker, Kubernetes
-- **Monitoring & Observability:** Prometheus, Grafana
-- **Machine Learning & AI:** Python, scikit-learn (Random Forest), FastAPI, LLM API
+- **CI/CD:** GitHub Actions (`.github/workflows/ci-cd-pipeline.yml`), Git, GitHub API
+- **Containerization & Orchestration:** Docker, Kubernetes (`k8s-prod-d4`)
+- **Monitoring & Observability:** Prometheus (prom-client exporter)
+- **Machine Learning & AI:** Python 3.10+, scikit-learn (Random Forest), FastAPI, LLM API
 - **Kubernetes Client:** Official Kubernetes API Client (`@kubernetes/client-node`)
 
 ---
 
 ## 7. Major Deliverables
-1. Production-ready React dashboard with live telemetry and AI failure gauges.
-2. Supervised ML pipeline trained on 2,500 controlled telemetry instances.
-3. FastAPI AI microservice providing real-time structured RCA and decision support.
-4. Safety-constrained Kubernetes self-healing controller with closed-loop verification.
-5. 8-stage Jenkins pipeline with sample microservice and chaos testing suite.
+1. Production-ready React enterprise dashboard with real-time telemetry, pod topology visualizer, and AI failure risk gauges.
+2. Supervised ML pipeline trained on multidimensional operational telemetry.
+3. FastAPI AI microservice providing real-time structured RCA and decision support (`POST /copilot/analyze`).
+4. Deterministic safety-guarded Kubernetes self-healing controller with closed-loop verification.
+5. Automated CI/CD pipeline in GitHub Actions with sample microservice and chaos testing suite.

@@ -73,16 +73,15 @@ After triggering a remediation (e.g., rolling restart or rollback):
 
 ## 4. Backend & CI/CD Questions (Tharun Gowda K)
 
-### Q8: What are the 8 canonical stages in your Jenkins pipeline?
+### Q8: What are the stages in your GitHub Actions CI/CD pipeline?
 **Answer:**  
-1. **Checkout:** Pulls source code from GitHub repository.
-2. **Install Dependencies:** Executes `npm ci` for deterministic module installation.
-3. **Test:** Runs automated unit and integration tests.
-4. **Build:** Compiles production assets.
-5. **Docker Build:** Builds container image tagged with the build number and `latest`.
-6. **Docker Push:** Pushes the container image to Docker Hub registry.
-7. **Kubernetes Deploy:** Applies Kubernetes manifests in the `devops-copilot` namespace.
-8. **Rollout Verification:** Validates `kubectl rollout status` and notifies the AI Copilot via webhook.
+The repository utilizes **GitHub Actions** (`.github/workflows/ci-cd-pipeline.yml`) with automated triggers on `push`, `pull_request`, and `workflow_dispatch`:
+1. **Checkout:** Pulls the source code repository via `actions/checkout@v4`.
+2. **Environment Setup & Testing:** Sets up Node.js and Python environments, installs dependencies, and runs backend safety tests, AI client integration tests, and ML evaluation.
+3. **Kubernetes Manifest Dry-Run Validation:** Validates deployment manifests and RBAC configurations.
+4. **Docker Buildx Packaging:** Builds multi-architecture container images for the microservice and AI service.
+5. **Container Registry Push:** Pushes versioned container images to the Docker Hub registry.
+6. **Kubernetes Rollout & Verification:** Deploys container workloads to the `k8s-prod-d4` cluster and tracks rollout status.
 
 ---
 

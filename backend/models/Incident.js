@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 const incidentSchema = new mongoose.Schema(
   {
@@ -13,10 +13,13 @@ const incidentSchema = new mongoose.Schema(
     rootCause: { type: String }, // LLM-generated explanation
     confidence: { type: Number, min: 0, max: 1 }, // AI confidence score
     rawLogsSnapshot: { type: String },
-    status: { type: String, enum: ['open', 'diagnosing', 'recovering', 'resolved'], default: 'open' },
+    status: {
+      type: String,
+      enum: ['open', 'diagnosing', 'recovering', 'resolved', 'escalated'],
+      default: 'open',
+    },
   },
   { timestamps: true }
 );
 
 module.exports = mongoose.model('Incident', incidentSchema);
-

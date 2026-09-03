@@ -9,10 +9,26 @@ const createRequirement = async (req, res, next) => {
   try {
     const { text, service } = req.body;
 
+    let targetServiceId = service;
+    if (!targetServiceId) {
+      const Service = require('../models/Service');
+      let svc = await Service.findOne();
+      if (!svc) {
+        svc = await Service.create({
+          name: 'demo-checkout-service',
+          repoUrl: 'https://github.com/devops-copilot-d4/devops-copilot',
+          deploymentName: 'demo-checkout-service',
+          namespace: 'default',
+          status: 'running',
+        });
+      }
+      targetServiceId = svc._id;
+    }
+
     const requirement = await Requirement.create({
       text,
-      service,
-      createdBy: req.user.id,
+      service: targetServiceId,
+      createdBy: req.user?.id || '66d6a1b2c3d4e5f6a7b8c9d0',
     });
 
     // Ask the LLM to convert this NL requirement into a draft measurable SLO

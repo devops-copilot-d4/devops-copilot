@@ -1,162 +1,154 @@
 import React, { useState } from 'react';
 
 const SettingsPanel = () => {
-  const [llmProvider, setLlmProvider] = useState('gemini');
-  const [autonomousHealing, setAutonomousHealing] = useState(true);
-  const [autoRollback, setAutoRollback] = useState(true);
-  const [prometheusUrl, setPrometheusUrl] = useState('http://localhost:9090');
-  const [scrapeInterval, setScrapeInterval] = useState('15s');
-  const [webhookUrl, setWebhookUrl] = useState('https://hooks.slack.com/services/T000/B000/XXXX');
+  const [refreshInterval, setRefreshInterval] = useState('5s');
+  const [autonomousRecovery, setAutonomousRecovery] = useState(true);
+  const [minConfidence, setMinConfidence] = useState('85%');
+  const [cooldownSec, setCooldownSec] = useState(60);
+  const [maxRetries, setMaxRetries] = useState(2);
   const [saveStatus, setSaveStatus] = useState(null);
 
   const handleSave = (e) => {
     e.preventDefault();
-    setSaveStatus('Cluster configuration and AI policies updated successfully.');
+    setSaveStatus('Cluster policies and safety parameters updated successfully.');
     setTimeout(() => setSaveStatus(null), 4000);
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
-      {/* AI & LLM Engine Settings */}
-      <div className="data-card">
-        <div className="card-header">
-          <div className="card-header-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4" />
-              <path d="M12 8h.01" />
-            </svg>
-            <span>AI Diagnostic Engine Policies</span>
-          </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
+      {/* 1. GENERAL SETTINGS */}
+      <div className="card-panel">
+        <div className="card-panel-header">
+          <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            General Configuration
+          </span>
+          <span className="badge-pill badge-neutral">Cluster Scope</span>
         </div>
-        <div className="card-body">
-          <div className="form-group">
-            <label className="form-label">Active LLM Provider</label>
+        <div className="card-panel-body">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Target Kubernetes Cluster</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Production orchestration plane</div>
+            </div>
+            <code className="font-mono">k8s-prod-d4</code>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Environment Tier</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Workload isolation boundary</div>
+            </div>
+            <span className="badge-pill badge-healthy">Production</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Telemetry Scrape Frequency</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>High-resolution time-series polling</div>
+            </div>
             <select
               className="form-select"
-              value={llmProvider}
-              onChange={(e) => setLlmProvider(e.target.value)}
+              value={refreshInterval}
+              onChange={(e) => setRefreshInterval(e.target.value)}
+              style={{ maxWidth: 130 }}
             >
-              <option value="gemini">Google Gemini 2.0 Flash (Default)</option>
-              <option value="claude">Anthropic Claude 3.5 Sonnet</option>
-              <option value="groq">Groq (Llama 3.3 70B)</option>
-              <option value="openai">OpenAI GPT-4o-mini</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border-subtle)' }}>
-            <div>
-              <strong style={{ fontSize: '12px' }}>Autonomous Execution Mode</strong>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {autonomousHealing ? 'Automatic remediation on detected breach' : 'Requires human operator approval'}
-              </div>
-            </div>
-            <button
-              type="button"
-              className={`btn ${autonomousHealing ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-              onClick={() => setAutonomousHealing(!autonomousHealing)}
-            >
-              {autonomousHealing ? 'Autonomous: Active' : 'Approval Gated'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Kubernetes Resilience Policy */}
-      <div className="data-card">
-        <div className="card-header">
-          <div className="card-header-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-            </svg>
-            <span>Kubernetes Policy Guard</span>
-          </div>
-        </div>
-        <div className="card-body">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid var(--border-subtle)' }}>
-            <div>
-              <strong style={{ fontSize: '12px' }}>SLO Verification Rollback</strong>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Auto-rollback if business SLO is not verified within 60s
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={autoRollback}
-              onChange={(e) => setAutoRollback(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: 'pointer' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6 }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Target Isolation Namespace:</span>
-            <code>default</code>
-          </div>
-        </div>
-      </div>
-
-      {/* Prometheus Telemetry Scraper */}
-      <div className="data-card">
-        <div className="card-header">
-          <div className="card-header-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-            <span>Prometheus Telemetry Gateway</span>
-          </div>
-        </div>
-        <div className="card-body">
-          <div className="form-group">
-            <label className="form-label">Prometheus Server URL</label>
-            <input
-              className="form-input"
-              value={prometheusUrl}
-              onChange={(e) => setPrometheusUrl(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Metrics Scrape Frequency</label>
-            <select
-              className="form-select"
-              value={scrapeInterval}
-              onChange={(e) => setScrapeInterval(e.target.value)}
-            >
-              <option value="5s">5 seconds (High resolution)</option>
-              <option value="15s">15 seconds (Standard)</option>
+              <option value="5s">5 seconds</option>
+              <option value="15s">15 seconds</option>
               <option value="30s">30 seconds</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Webhooks & Alerts */}
-      <div className="data-card">
-        <div className="card-header">
-          <div className="card-header-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            <span>Alerting &amp; Notification Webhooks</span>
-          </div>
+      {/* 2. AI INTELLIGENCE POLICIES */}
+      <div className="card-panel">
+        <div className="card-panel-header">
+          <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--accent-ai)' }}>
+            AI Diagnostic Engine
+          </span>
+          <span className="badge-pill badge-ai">✦ Inference Engine</span>
         </div>
-        <div className="card-body">
-          <div className="form-group">
-            <label className="form-label">Slack / Incident Dispatch Webhook</label>
-            <input
-              className="form-input"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-            />
+        <div className="card-panel-body">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Failure Prediction Model</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Supervised Random Forest Classifier</div>
+            </div>
+            <span className="badge-pill badge-healthy">Enabled</span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-            <button type="button" onClick={handleSave} className="btn btn-primary">
-              Save Policy Changes
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Autonomous Self-Healing</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Execute allow-listed remediation</div>
+            </div>
+            <button
+              onClick={() => setAutonomousRecovery(!autonomousRecovery)}
+              className={`btn ${autonomousRecovery ? 'btn-ai' : 'btn-secondary'} btn-sm`}
+            >
+              {autonomousRecovery ? 'Enabled' : 'Approval Gated'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Minimum Confidence Threshold</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Confidence required for auto-remediation</div>
+            </div>
+            <select
+              className="form-select"
+              value={minConfidence}
+              onChange={(e) => setMinConfidence(e.target.value)}
+              style={{ maxWidth: 100 }}
+            >
+              <option value="80%">80%</option>
+              <option value="85%">85%</option>
+              <option value="90%">90%</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. SAFETY GUARDRAILS */}
+      <div className="card-panel" style={{ gridColumn: '1 / -1' }}>
+        <div className="card-panel-header">
+          <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Safety Guardrails &amp; Policy Bounds
+          </span>
+          <span className="badge-pill badge-healthy">Policy Enforced</span>
+        </div>
+        <div className="card-panel-body">
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+              Approved Allow-List Actions
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <span className="badge-pill badge-healthy" style={{ padding: '4px 10px' }}>✓ Restart Pod</span>
+              <span className="badge-pill badge-healthy" style={{ padding: '4px 10px' }}>✓ Rollback Deployment</span>
+              <span className="badge-pill badge-healthy" style={{ padding: '4px 10px' }}>✓ Scale Deployment</span>
+              <span className="badge-pill badge-healthy" style={{ padding: '4px 10px' }}>✓ Recreate Resource</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Maximum Autonomous Retries</div>
+              <div className="font-mono" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>{maxRetries} Retries</div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Safety Cooldown Window</div>
+              <div className="font-mono" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>{cooldownSec} Seconds</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+            <button onClick={handleSave} className="btn btn-primary btn-sm">
+              Save Configuration
             </button>
           </div>
           {saveStatus && (
-            <div style={{ color: 'var(--status-success)', fontSize: '12px', marginTop: 4 }}>
+            <div style={{ color: 'var(--status-healthy)', fontSize: '12px' }}>
               {saveStatus}
             </div>
           )}

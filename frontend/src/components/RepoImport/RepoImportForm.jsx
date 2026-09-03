@@ -49,119 +49,119 @@ const RepoImportForm = ({ services = [], onServiceCreated, onDeploymentTriggered
   };
 
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* SECTION 1: REGISTER SERVICE */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: 'var(--accent)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </span>
-            <span>Register New Microservice</span>
-          </h3>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 12 }}>
-            Kubernetes Workload
+    <div className="card-panel">
+      <div className="card-panel-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ color: 'var(--accent-primary)' }}>●</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Workload Registration &amp; Pipeline Rollout
           </span>
         </div>
-
-        <form onSubmit={handleCreateService} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <input
-              placeholder="Service Identifier (e.g. checkout-service)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              style={{ flex: 1, minWidth: '200px' }}
-            />
-            <input
-              placeholder="Git Repository URL (https://github.com/...)"
-              value={repoUrl}
-              onChange={(e) => setRepoUrl(e.target.value)}
-              required
-              style={{ flex: 1.5, minWidth: '240px' }}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" disabled={isCreating} style={{ padding: '8px 16px', fontSize: '13px' }}>
-              {isCreating ? 'Registering...' : 'Register Service'}
-            </button>
-          </div>
-        </form>
+        <span className="badge-pill badge-neutral font-mono">k8s-prod-d4</span>
       </div>
 
-      <div style={{ height: '1px', background: 'var(--border)' }} />
-
-      {/* SECTION 2: TRIGGER CI/CD DEPLOYMENT */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: 'var(--cyan)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <div className="card-panel-body" style={{ gap: 18 }}>
+        {/* SECTION 1: REGISTER SERVICE */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Register New Microservice
             </span>
-            <span>Trigger CI/CD Pipeline</span>
-          </h3>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 12 }}>
-            GitHub Actions / ArgoCD
-          </span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Kubernetes Isolation Boundary</span>
+          </div>
+
+          <form onSubmit={handleCreateService} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                className="form-input"
+                placeholder="Service Identifier (e.g. checkout-service)"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                style={{ flex: 1, minWidth: '180px' }}
+              />
+              <input
+                className="form-input"
+                placeholder="Git Repository URL (https://github.com/...)"
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                required
+                style={{ flex: 1.5, minWidth: '220px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" disabled={isCreating} className="btn btn-primary btn-sm">
+                {isCreating ? 'Registering...' : 'Register Service'}
+              </button>
+            </div>
+          </form>
         </div>
 
-        <form onSubmit={handleTriggerDeployment} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <select
-              value={selectedServiceId}
-              onChange={(e) => setSelectedServiceId(e.target.value)}
-              style={{ flex: 1.2, minWidth: '200px' }}
-            >
-              <option value="">-- Choose Target Service --</option>
-              {services.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.name} ({s.namespace || 'default'})
-                </option>
-              ))}
-            </select>
-            <input
-              placeholder="Target Commit SHA (optional, defaults to HEAD)"
-              value={commitSha}
-              onChange={(e) => setCommitSha(e.target.value)}
-              style={{ flex: 1, minWidth: '180px', fontFamily: 'monospace' }}
-            />
+        <div style={{ height: '1px', background: 'var(--border)' }} />
+
+        {/* SECTION 2: TRIGGER CI/CD DEPLOYMENT */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Dispatch CI/CD Rollout
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>GitHub Actions / ArgoCD</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="submit"
-              disabled={isDeploying || !selectedServiceId}
-              style={{
-                padding: '8px 16px',
-                fontSize: '13px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
-              }}
-            >
-              {isDeploying ? 'Dispatching...' : 'Trigger Rollout'}
-            </button>
+
+          <form onSubmit={handleTriggerDeployment} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <select
+                className="form-select"
+                value={selectedServiceId}
+                onChange={(e) => setSelectedServiceId(e.target.value)}
+                style={{ flex: 1.2, minWidth: '180px' }}
+              >
+                <option value="">-- Choose Target Service --</option>
+                {services.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name} ({s.namespace || 'default'})
+                  </option>
+                ))}
+              </select>
+              <input
+                className="form-input font-mono"
+                placeholder="Target Commit SHA (defaults to HEAD)"
+                value={commitSha}
+                onChange={(e) => setCommitSha(e.target.value)}
+                style={{ flex: 1, minWidth: '160px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="submit"
+                disabled={isDeploying || !selectedServiceId}
+                className="btn btn-secondary btn-sm"
+                style={{ color: 'var(--status-telemetry)', fontWeight: 600 }}
+              >
+                {isDeploying ? 'Dispatching...' : 'Trigger Rollout'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Status Alert */}
+        {status && (
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '12px',
+              background: status.type === 'success' ? 'var(--status-healthy-subtle)' : 'var(--status-critical-subtle)',
+              border: `1px solid ${status.type === 'success' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+              color: status.type === 'success' ? 'var(--status-healthy)' : 'var(--status-critical)',
+            }}
+          >
+            {status.message}
           </div>
-        </form>
+        )}
       </div>
-
-      {/* FEEDBACK STATUS ALERT */}
-      {status && (
-        <div
-          style={{
-            padding: '10px 14px',
-            borderRadius: 8,
-            fontSize: '13px',
-            background: status.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-            border: `1px solid ${status.type === 'success' ? 'var(--success)' : 'var(--danger)'}`,
-            color: status.type === 'success' ? '#a7f3d0' : '#fecaca',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <span>{status.message}</span>
-        </div>
-      )}
     </div>
   );
 };
 
-export default RepoImportForm;
+export default RepoImportForm;

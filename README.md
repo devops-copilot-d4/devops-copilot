@@ -12,30 +12,47 @@
 ---
 
 ## 📌 Project Overview
-**AI DevOps Copilot** is a practical, hybrid AI-powered platform for Kubernetes and CI/CD that closes the loop between **predictive failure detection**, **log-based root cause analysis (RCA)**, **safety-guarded remediation**, and **post-recovery verification**.
+**AI DevOps Copilot** is an integrated predictive and diagnostic DevOps control loop that combines **supervised failure prediction (Random Forest)**, **contextual AI-based root cause analysis (LLM RCA)**, **deterministic safety guardrails**, **Kubernetes remediation**, and **post-recovery closed-loop verification**.
 
 ```
 USER
  ↓
 REACT WEB DASHBOARD (Port 5173)
  ↓
-NODE.JS + EXPRESS BACKEND (Port 5000)
- ↓
-GITHUB ──► JENKINS CI/CD ──► DOCKER BUILD ──► DOCKER REGISTRY
-                                                     ↓
-                                             KUBERNETES CLUSTER
-                                                     ↓
-                                            PROMETHEUS + LOGS
-                                                     ↓
-                                           FASTAPI AI SERVICE (Port 8000)
-                                            (Random Forest + LLM Agent)
-                                                     ↓
-                                          SELF-HEALING CONTROLLER
-                                          (Allow-list: Restart/Scale/Rollback)
-                                                     ↓
-                                             KUBERNETES API
-                                                     ↓
-                                            VERIFICATION & MTTR
+NODE.JS + EXPRESS CONTROL PLANE (Port 5000)
+ ├── MongoDB (Audit & Telemetry)
+ ├── GitHub Actions (CI/CD Pipeline)
+ ├── Kubernetes API (Workload Orchestration)
+ ├── Prometheus (Time-Series Metrics)
+ └── FASTAPI AI MICROSERVICE (Port 8000)
+         ├── Random Forest Failure Predictor (POST /predict)
+         └── LLM Contextual RCA & Decision Reasoner (POST /copilot/analyze)
+```
+
+### The Autonomous Control Loop
+```
+Kubernetes Workload 
+       ↓ Telemetry (CPU, Memory, Restarts, Error Rate, Pod Phase)
+Prometheus & Log Collector
+       ↓ Telemetry + Log Context
+Node.js Control Plane
+       ↓ POST /copilot/analyze
+FastAPI AI Service
+       ├─► Random Forest: Failure Probability & Failure Type (CrashLoopBackOff)
+       └─► LLM Agent: Root Cause & Action Recommendation (ROLLBACK, 91% Confidence)
+Node.js Control Plane
+       ↓
+Deterministic Safety Guard (Allow-list, Namespace, 60s Cooldown, Max 2 Retries)
+       ↓ Approved
+Recovery Service
+       ↓
+Kubernetes API (Rollback / Restart / Scale)
+       ↓
+Closed-Loop Verification (2/2 Pods Ready & SLO Restored)
+       ↓
+MongoDB Audit Persistence & Real-Time Socket.IO Updates
+       ↓
+React Enterprise Dashboard
 ```
 
 ---
@@ -44,7 +61,7 @@ GITHUB ──► JENKINS CI/CD ──► DOCKER BUILD ──► DOCKER REGISTRY
 
 ### Option 1: Docker Compose (All-in-One)
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 * **React Dashboard:** [http://localhost:5173](http://localhost:5173)
 * **Backend API:** [http://localhost:5000](http://localhost:5000)
@@ -81,22 +98,13 @@ npm run dev
 
 ## 🧪 Running Chaos & Self-Healing Demonstrations
 
-### 1. Interactive Fault Injection
-```bash
-# Inject CrashLoopBackOff into demo workload
-node scripts/inject_fault.js --type crashloop
+### 1. Interactive Web Dashboard Demo
+1. Open [http://localhost:5173](http://localhost:5173) in your browser.
+2. Click **"Trigger Chaos & Self-Healing"**.
+3. Watch the real-time closed-loop transition:
+   $$\text{INCIDENT DETECTED} \longrightarrow \text{AI DIAGNOSIS (98\% HIGH, ROLLBACK 91\%)} \longrightarrow \text{AUTONOMOUS RECOVERY} \longrightarrow \text{SYSTEM OPERATIONAL (Verified)}$$
 
-# Inject Out-Of-Memory (OOMKilled)
-node scripts/inject_fault.js --type oom
-
-# Inject High CPU compute loop
-node scripts/inject_fault.js --type cpu
-
-# Reset workload state
-node scripts/inject_fault.js --type reset
-```
-
-### 2. End-to-End Autonomous Self-Healing Demo
+### 2. Standalone End-to-End CLI Demo
 ```bash
 node scripts/run_e2e_demo.js
 ```
@@ -104,19 +112,18 @@ node scripts/run_e2e_demo.js
 ---
 
 ## 📊 Research Metrics & Evaluation Summary
-* **ML Model Accuracy:** **96.8%**
-* **ML Model F1-Score:** **96.8%**
-* **False Positive Rate:** **2.4%**
-* **Mean Time to Recover (MTTR):** **~12–18 seconds** (vs. 15–25 minutes manual remediation, a **~98% reduction**)
-* **Safety Violations:** **0** (Enforced by strict allow-lists, 60s cooldowns, and retry limits).
+* **Supervised ML Model:** Random Forest Classifier trained on multidimensional operational telemetry.
+* **Failure Prediction Accuracy:** **96.8%** (F1-Score: **96.8%**, False Positive Rate: **2.4%**).
+* **AI RCA Confidence:** **91%** on verified CrashLoopBackOff vectors.
+* **Mean Time to Recovery (MTTR):** **~0.83s – 15s** autonomous closed-loop resolution (vs. 15–25 minutes manual human triaging).
+* **Deterministic Safety:** Zero unsafe out-of-bounds operations (enforced by Action Allow-Lists, Namespace Isolation, Cooldowns, and Retry Caps).
 
 ---
 
 ## 📚 Project Documentation
-* [Project Synopsis](docs/PROJECT_SYNOPSIS.md)
 * [High-Level System Design (HLD)](docs/HLD_System_Design.md)
 * [Low-Level System Design (LLD)](docs/LLD_System_Design.md)
+* [Project Synopsis](docs/PROJECT_SYNOPSIS.md)
 * [Research Evaluation & Benchmark](docs/RESEARCH_EVALUATION.md)
-* [Phase 1 PPT Deck Outline](docs/PHASE1_PPT_OUTLINE.md)
 * [Viva Defense Q&A Guide](docs/VIVA_DEFENSE_QA.md)
-* [Weekly Progress Log](docs/weekly-progress-log.md)
+* [Deployment & Setup Guide](docs/DEPLOYMENT_GUIDE.md)

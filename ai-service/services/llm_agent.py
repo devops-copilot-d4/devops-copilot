@@ -147,9 +147,9 @@ RULES:
             action = "RESTART"
             
         return CopilotDiagnosisResponse(
-            risk=parsed.get("risk", bundle.ml_risk_level),
-            failure_type=parsed.get("failure_type", bundle.predicted_failure_type),
-            probability=float(parsed.get("probability", bundle.ml_failure_probability)),
+            risk=bundle.ml_risk_level,
+            failure_type=bundle.predicted_failure_type,
+            probability=bundle.ml_failure_probability,
             likely_cause=parsed.get("likely_cause", "Anomaly identified in deployment telemetry"),
             recommended_action=action,
             reason=parsed.get("reason", "Action chosen based on operational telemetry pattern"),

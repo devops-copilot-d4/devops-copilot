@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 const recoveryActionSchema = new mongoose.Schema(
   {
@@ -6,7 +6,7 @@ const recoveryActionSchema = new mongoose.Schema(
     service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
     actionType: {
       type: String,
-      enum: ['restart', 'rollback', 'scale_up', 'scale_down', 'alert_only'],
+      enum: ['restart', 'rollback', 'scale_up', 'scale_down', 'recreate', 'alert_only'],
       required: true,
     },
     reason: { type: String }, // LLM explainability text: why this action was chosen
@@ -18,9 +18,9 @@ const recoveryActionSchema = new mongoose.Schema(
       default: 'pending_approval',
     },
     requirementVerified: { type: Boolean, default: false }, // post-recovery SLO check result
+    mttr: { type: Number }, // Mean Time to Recover in seconds
   },
   { timestamps: true }
 );
 
 module.exports = mongoose.model('RecoveryAction', recoveryActionSchema);
-

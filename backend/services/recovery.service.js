@@ -14,6 +14,17 @@ const MAX_RETRIES = 2; // Prevent infinite self-healing loops
 const cooldownTracker = new Map();
 const retryTracker = new Map();
 
+const normalizeActionType = (action) => {
+  const upper = (action || '').toUpperCase();
+  if (upper === 'RESTART') return 'restart';
+  if (upper === 'ROLLBACK') return 'rollback';
+  if (upper === 'SCALE' || upper === 'SCALE_UP') return 'scale_up';
+  if (upper === 'SCALE_DOWN') return 'scale_down';
+  if (upper === 'RECREATE') return 'recreate';
+  if (['restart', 'rollback', 'scale_up', 'scale_down', 'recreate', 'alert_only'].includes(action)) return action;
+  return 'restart';
+};
+
 class RecoveryService {
   /**
    * Validates if a proposed recovery action complies with safety rules.
@@ -54,7 +65,7 @@ class RecoveryService {
    */
   async executeRecovery({
     serviceId,
-    deploymentName,
+    deploymentName = 'demo-checkout-service',
     namespace = 'default',
     actionType,
     rootCause = 'Operational anomaly detected',
@@ -65,6 +76,7 @@ class RecoveryService {
     const startTime = Date.now();
     const key = `${namespace}/${deploymentName}`;
     const normalizedAction = actionType.toUpperCase();
+    const canonicalActionType = normalizeActionType(actionType);
 
     // Validate safety constraints
     const safety = this.validateSafety({ deploymentName, namespace, actionType, bypassCooldown });
@@ -87,20 +99,72 @@ class RecoveryService {
 
     console.log(`[Self-Healing Controller] Executing action '${normalizedAction}' on ${deploymentName} in ${namespace}`);
 
-    // Create DB Audit Record if model exists
+    // Resolve Service Document
+    let targetServiceId = serviceId;
+    if (!targetServiceId) {
+      try {
+        let svc = await Service.findOne({
+          $or: [
+            { deploymentName: deploymentName },
+            { name: deploymentName },
+          ],
+        });
+        if (!svc) {
+          svc = await Service.create({
+            name: deploymentName || 'demo-checkout-service',
+            repoUrl: 'https://github.com/devops-copilot-d4/devops-copilot',
+            deploymentName: deploymentName || 'demo-checkout-service',
+            namespace: namespace || 'default',
+            status: 'running',
+          });
+        }
+        targetServiceId = svc._id;
+      } catch (svcErr) {
+        console.warn(`[Self-Healing] Service resolution notice: ${svcErr.message}`);
+      }
+    }
+
+    // Resolve Incident Document
+    let targetIncidentId = incidentId;
+    if (!targetIncidentId && targetServiceId) {
+      try {
+        let inc = await Incident.findOne({
+          service: targetServiceId,
+          status: { $in: ['open', 'diagnosing'] },
+        }).sort({ createdAt: -1 });
+
+        if (!inc) {
+          inc = await Incident.create({
+            service: targetServiceId,
+            type: 'runtime_failure',
+            severity: 'high',
+            rootCause: rootCause || 'Operational anomaly detected by AI DevOps Copilot',
+            confidence: 0.91,
+            status: 'diagnosing',
+          });
+        }
+        targetIncidentId = inc._id;
+      } catch (incErr) {
+        console.warn(`[Self-Healing] Incident resolution notice: ${incErr.message}`);
+      }
+    }
+
+    // Create DB Audit Record
     let actionRecord = null;
-    try {
-      actionRecord = await RecoveryAction.create({
-        service: serviceId,
-        incident: incidentId,
-        actionType: normalizedAction.toLowerCase(),
-        reason,
-        status: 'executing',
-        requiresApproval: false,
-      });
-      emitEvent('recovery:new', { actionId: actionRecord._id, actionType: normalizedAction });
-    } catch (e) {
-      console.log(`[Self-Healing] Running without persistence: ${e.message}`);
+    if (targetServiceId && targetIncidentId) {
+      try {
+        actionRecord = await RecoveryAction.create({
+          service: targetServiceId,
+          incident: targetIncidentId,
+          actionType: canonicalActionType,
+          reason,
+          status: 'executing',
+          requiresApproval: false,
+        });
+        emitEvent('recovery:new', { actionId: actionRecord._id, actionType: normalizedAction });
+      } catch (e) {
+        console.warn(`[Self-Healing] RecoveryAction creation warning: ${e.message}`);
+      }
     }
 
     // 1. Dispatch K8s API Operation
@@ -152,7 +216,14 @@ class RecoveryService {
       if (actionRecord) {
         actionRecord.status = 'success';
         actionRecord.requirementVerified = true;
+        actionRecord.mttr = mttrSeconds;
         await actionRecord.save();
+      }
+
+      if (targetIncidentId) {
+        try {
+          await Incident.findByIdAndUpdate(targetIncidentId, { status: 'resolved' });
+        } catch (incUpdErr) {}
       }
 
       emitEvent('recovery:update', {
@@ -179,7 +250,14 @@ class RecoveryService {
       if (actionRecord) {
         actionRecord.status = 'failed';
         actionRecord.requirementVerified = false;
+        actionRecord.mttr = mttrSeconds;
         await actionRecord.save();
+      }
+
+      if (targetIncidentId) {
+        try {
+          await Incident.findByIdAndUpdate(targetIncidentId, { status: 'escalated' });
+        } catch (incUpdErr) {}
       }
 
       emitEvent('recovery:update', {

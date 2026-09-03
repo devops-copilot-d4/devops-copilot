@@ -18,21 +18,33 @@ async function runEndToEndDemo() {
   console.log('Team: Tharun Gowda K, Vikas S, Vishnu M, Yashwanth P | Guide: Mrs. Sneha S\n');
 
   const deploymentName = 'demo-checkout-service';
-  const namespace = 'devops-copilot';
+  const namespace = 'default';
+
+  // Connect MongoDB if running standalone
+  const mongoose = require('mongoose');
+  const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/devops_copilot';
+  if (mongoose.connection.readyState === 0) {
+    try {
+      await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 3000 });
+      console.log('✓ MongoDB connection established for audit logging');
+    } catch (e) {
+      console.log(`[Demo Runner] MongoDB notice: ${e.message}`);
+    }
+  }
 
   // Step 1: Ingest Runtime Telemetry with Injected Fault
   console.log('👉 [STEP 1] Ingesting Runtime Telemetry with Injected Fault...');
   const faultTelemetry = {
-    cpu_usage: 48.5,
-    memory_usage: 62.0,
-    restart_count: 5,
-    error_rate: 85.0,
-    response_time: 4.2,
+    cpu_usage: 95.0,
+    memory_usage: 92.0,
+    restart_count: 6,
+    error_rate: 18.0,
+    response_time: 3.0,
     recent_deployment: 1,
     pod_status: 'CrashLoopBackOff',
-    deployment_status: 'Degraded',
-    log_error_count: 24,
-    event_count: 12,
+    deployment_status: 'Failed',
+    log_error_count: 8,
+    event_count: 5,
     health_status: 'Unhealthy',
   };
 
@@ -139,6 +151,10 @@ async function runEndToEndDemo() {
   console.log(`Mean Time to Recover: ${executionResult.mttr} seconds`);
   console.log(`Workload State:       Healthy (2/2 Pods Ready)`);
   console.log('='.repeat(70) + '\n');
+
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect().catch(() => {});
+  }
 }
 
 if (require.main === module) {
