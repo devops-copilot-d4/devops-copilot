@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const RecoveryAction = require('../models/RecoveryAction');
 const Incident = require('../models/Incident');
 const Service = require('../models/Service');
@@ -101,7 +102,7 @@ class RecoveryService {
 
     // Resolve Service Document
     let targetServiceId = serviceId;
-    if (!targetServiceId) {
+    if (!targetServiceId && mongoose.connection.readyState === 1) {
       try {
         let svc = await Service.findOne({
           $or: [
@@ -114,7 +115,7 @@ class RecoveryService {
             name: deploymentName || 'demo-checkout-service',
             repoUrl: 'https://github.com/devops-copilot-d4/devops-copilot',
             deploymentName: deploymentName || 'demo-checkout-service',
-            namespace: namespace || 'default',
+            namespace: namespace || 'devops-copilot',
             status: 'running',
           });
         }
@@ -126,7 +127,7 @@ class RecoveryService {
 
     // Resolve Incident Document
     let targetIncidentId = incidentId;
-    if (!targetIncidentId && targetServiceId) {
+    if (!targetIncidentId && targetServiceId && mongoose.connection.readyState === 1) {
       try {
         let inc = await Incident.findOne({
           service: targetServiceId,
@@ -151,7 +152,7 @@ class RecoveryService {
 
     // Create DB Audit Record
     let actionRecord = null;
-    if (targetServiceId && targetIncidentId) {
+    if (targetServiceId && targetIncidentId && mongoose.connection.readyState === 1) {
       try {
         actionRecord = await RecoveryAction.create({
           service: targetServiceId,

@@ -138,16 +138,16 @@ const triggerChaosSpike = async (req, res, next) => {
 
     // 4. Construct Live Failure Telemetry Payload for AI Diagnosis
     const faultTelemetry = {
-      cpu_usage: 95.0,
-      memory_usage: 92.0,
+      cpu_usage: 45.0,
+      memory_usage: 55.0,
       restart_count: 6,
-      error_rate: 18.0,
-      response_time: 3.0,
+      error_rate: 30.0,
+      response_time: 450.0,
       recent_deployment: 1,
       pod_status: 'CrashLoopBackOff',
-      deployment_status: 'Failed',
+      deployment_status: 'Degraded',
       log_error_count: 8,
-      event_count: 5,
+      event_count: 12,
       health_status: 'Unhealthy',
     };
 

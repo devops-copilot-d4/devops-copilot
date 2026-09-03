@@ -16,6 +16,7 @@ spec:
       containers:
         - name: checkout-api
           image: tharungowda/demo-checkout-service:v1.0.0
+          imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "echo '[FATAL] Missing DB credentials! Application crashing...' && exit 1"]
           resources:
             requests:

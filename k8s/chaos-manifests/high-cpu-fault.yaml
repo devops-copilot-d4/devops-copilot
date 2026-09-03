@@ -16,6 +16,7 @@ spec:
       containers:
         - name: checkout-api
           image: tharungowda/demo-checkout-service:v1.0.0
+          imagePullPolicy: IfNotPresent
           command: ["node", "-e", "while(true){ Math.sqrt(Math.random()); }"]
           resources:
             limits:
