@@ -1,0 +1,7 @@
+﻿Explain in 2-3 plain-English sentences why the recovery action "{{ACTION_TYPE}}"
+was chosen, given the root cause "{{ROOT_CAUSE}}" and business impact
+"{{BUSINESS_IMPACT}}".
+
+Write for a non-technical stakeholder reading a dashboard - avoid jargon,
+keep it concrete and specific to this incident.
+

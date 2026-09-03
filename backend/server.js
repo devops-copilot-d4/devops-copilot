@@ -1,0 +1,72 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const connectDB = require('./config/db');
+const { initSocket } = require('./services/socket.service');
+const errorHandler = require('./middleware/errorHandler.middleware');
+
+const authRoutes = require('./routes/auth.routes');
+const requirementRoutes = require('./routes/requirement.routes');
+const deploymentRoutes = require('./routes/deployment.routes');
+const monitoringRoutes = require('./routes/monitoring.routes');
+const aiRoutes = require('./routes/ai.routes');
+const recoveryRoutes = require('./routes/recovery.routes');
+const serviceRoutes = require('./routes/service.routes');
+const simulationRoutes = require('./routes/simulation.routes');
+
+const app = express();
+const server = http.createServer(app);
+
+// Connect to MongoDB
+connectDB();
+
+// Core middleware
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
+
+// Health check
+app.get('/', (req, res) => {
+  res.json({
+    message: 'AI DevOps Copilot API is running',
+    title: 'AI DevOps Copilot – AI Agent for Autonomous CI/CD Failure Prediction and Self-Healing',
+    team: ['Tharun Gowda K', 'Vikas S', 'Vishnu M', 'Yashwanth P'],
+    status: 'online',
+  });
+});
+
+// Prometheus Scrape Endpoint
+const client = require('prom-client');
+const collectDefaultMetrics = client.collectDefaultMetrics;
+collectDefaultMetrics({ register: client.register });
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', client.register.contentType);
+  res.end(await client.register.metrics());
+});
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/requirements', requirementRoutes);
+app.use('/api/deployments', deploymentRoutes);
+app.use('/api/monitoring', monitoringRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/recovery', recoveryRoutes);
+app.use('/api/simulation', simulationRoutes);
+
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
+// Central error handler (always last)
+app.use(errorHandler);
+
+// Socket.IO for real-time dashboard updates
+initSocket(server);
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+

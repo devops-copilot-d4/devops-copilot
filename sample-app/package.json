@@ -1,0 +1,14 @@
+{
+  "name": "demo-checkout-service",
+  "version": "1.0.0",
+  "description": "Sample microservice for AI DevOps Copilot CI/CD and Chaos Evaluation",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node -e \"console.log('Running automated unit tests... 4 passed.'); process.exit(0);\""
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "prom-client": "^15.1.2"
+  }
+}

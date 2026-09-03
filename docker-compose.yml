@@ -1,0 +1,99 @@
+services:
+  # 1. MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: devops-copilot-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - copilot-net
+
+  # 2. FastAPI AI Service (ML + LLM Agent)
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: devops-copilot-ai
+    ports:
+      - "8000:8000"
+    environment:
+      - AI_SERVICE_PORT=8000
+      - LLM_API_URL=${LLM_API_URL:-https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+    volumes:
+      - ./ai-service:/app
+      - ./ml:/app/ml
+    networks:
+      - copilot-net
+
+  # 3. Node.js Express Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: devops-copilot-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/devops-copilot
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=copilot-jwt-super-secret-key-2026
+      - CLIENT_URL=http://localhost:5173
+    depends_on:
+      - mongodb
+      - ai-service
+    networks:
+      - copilot-net
+
+  # 4. React Frontend Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: devops-copilot-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+    depends_on:
+      - backend
+    networks:
+      - copilot-net
+
+  # 5. Demo Microservice (Target Workload & Chaos Testing)
+  demo-app:
+    build:
+      context: ./sample-app
+      dockerfile: Dockerfile
+    container_name: demo-checkout-service
+    ports:
+      - "3000:3000"
+    networks:
+      - copilot-net
+
+  # 6. Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: devops-copilot-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./k8s/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - copilot-net
+
+networks:
+  copilot-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
