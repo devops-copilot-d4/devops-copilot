@@ -24,16 +24,15 @@ const SelfHealingPanel = () => {
         deploymentName: 'demo-checkout-service',
         namespace: 'default',
         actionType,
-        reason: `Triggered ${actionType} self-healing remediation from dashboard.`,
-        rootCause: 'Operator chaos experiment or detected degradation',
+        reason: `Triggered ${actionType} self-healing remediation from control plane.`,
+        rootCause: 'Operator chaos experiment or detected telemetry degradation',
       });
       setLastResult(res.data);
       load();
     } catch (err) {
-      console.error('Self-healing execution failed:', err);
       setLastResult({
         success: false,
-        status: 'BLOCKED_OR_FAILED',
+        status: 'BLOCKED_BY_SAFETY_POLICY',
         message: err.response?.data?.message || err.message,
       });
     } finally {
@@ -46,150 +45,147 @@ const SelfHealingPanel = () => {
     load();
   };
 
+  const getActionBadgeClass = (status) => {
+    if (status === 'success' || status === 'RECOVERY_SUCCESSFUL') return 'badge-success';
+    if (status === 'failed' || status === 'BLOCKED_BY_SAFETY_POLICY') return 'badge-danger';
+    return 'badge-warning';
+  };
+
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>Self-Healing Controller &amp; Safety Layer</span>
-        </h3>
+    <div className="data-card">
+      <div className="card-header">
+        <div className="card-header-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          </svg>
+          <span>Autonomous Self-Healing Controller &amp; Safety Layer</span>
+        </div>
+        <span className="badge badge-success">Policy Guard Active</span>
       </div>
 
-      {/* Manual Demo Remediation Triggers */}
-      <div style={{ backgroundColor: '#1e293b', padding: 12, borderRadius: 8 }}>
-        <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-          Controlled Remediation (Allow-List Protected)
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            disabled={executing}
-            onClick={() => handleTriggerAction('ROLLBACK')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: '#dc2626',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
-          >
-            Rollback Deployment
-          </button>
-          <button
-            disabled={executing}
-            onClick={() => handleTriggerAction('RESTART')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: '#d97706',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
-          >
-            Rolling Restart
-          </button>
-          <button
-            disabled={executing}
-            onClick={() => handleTriggerAction('SCALE')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: '#16a34a',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
-          >
-            Scale Replicas (HPA)
-          </button>
-        </div>
-      </div>
-
-      {/* Real-time Verification Feedback Result */}
-      {lastResult && (
-        <div
-          style={{
-            backgroundColor: lastResult.success ? '#064e3b' : '#7f1d1d',
-            padding: 12,
-            borderRadius: 6,
-            fontSize: '13px',
-            color: '#f8fafc',
-            border: `1px solid ${lastResult.success ? '#10b981' : '#f87171'}`,
-          }}
-        >
-          <strong>Status: {lastResult.status}</strong>
-          {lastResult.mttr != null && (
-            <span style={{ marginLeft: 12, color: '#6ee7b7' }}>
-              • Verification MTTR: <strong>{lastResult.mttr}s</strong>
+      <div className="card-body">
+        {/* Controlled Remediation Trigger Deck */}
+        <div style={{
+          background: 'var(--bg-surface-elevated)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Allow-List Protected Actions (Target: demo-checkout-service)
             </span>
-          )}
-          {lastResult.message && <div style={{ marginTop: 4 }}>{lastResult.message}</div>}
-        </div>
-      )}
+          </div>
 
-      {/* Recovery History */}
-      <div>
-        <h4 style={{ margin: '8px 0 6px 0', fontSize: '13px', color: '#cbd5e1', fontWeight: 600 }}>Remediation &amp; Verification History</h4>
-        {actions.length === 0 ? (
-          <p style={{ fontSize: '12px', color: '#94a3b8' }}>No recovery actions executed yet.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {actions.slice(0, 5).map((a) => (
-              <li
-                key={a._id}
-                style={{
-                  backgroundColor: '#0f172a',
-                  padding: 10,
-                  borderRadius: 6,
-                  border: '1px solid #334155',
-                  fontSize: '12px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>
-                    <strong style={{ color: '#38bdf8' }}>{a.actionType?.toUpperCase()}</strong> on{' '}
-                    <em>{a.service?.name || 'checkout-service'}</em>
-                  </span>
-                  <span
-                    style={{
-                      color: a.status === 'success' ? '#22c55e' : a.status === 'failed' ? '#ef4444' : '#f59e0b',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {a.status === 'success' ? 'RECOVERY SUCCESSFUL' : a.status}
-                  </span>
-                </div>
-                {a.requiresApproval && a.status === 'pending_approval' && (
-                  <button
-                    onClick={() => handleApprove(a._id)}
-                    style={{
-                      marginTop: 6,
-                      padding: '4px 8px',
-                      backgroundColor: '#2563eb',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Approve Action
-                  </button>
-                )}
-                {a.reason && (
-                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: 4 }}>
-                    {a.reason}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              disabled={executing}
+              onClick={() => handleTriggerAction('ROLLBACK')}
+              className="btn btn-secondary btn-sm"
+              style={{ color: 'var(--status-danger)' }}
+            >
+              Rollback Deployment
+            </button>
+            <button
+              disabled={executing}
+              onClick={() => handleTriggerAction('RESTART')}
+              className="btn btn-secondary btn-sm"
+              style={{ color: 'var(--status-warning)' }}
+            >
+              Rolling Restart
+            </button>
+            <button
+              disabled={executing}
+              onClick={() => handleTriggerAction('SCALE')}
+              className="btn btn-secondary btn-sm"
+              style={{ color: 'var(--status-success)' }}
+            >
+              Scale Replicas (HPA)
+            </button>
+          </div>
+        </div>
+
+        {/* Real-Time Execution Feedback Card */}
+        {lastResult && (
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '12px',
+              background: lastResult.success ? 'var(--status-success-subtle)' : 'var(--status-danger-subtle)',
+              border: `1px solid ${lastResult.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              color: lastResult.success ? 'var(--status-success)' : 'var(--status-danger)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>STATUS: {lastResult.status}</strong>
+              {lastResult.mttr != null && (
+                <span className="font-mono">Verification MTTR: {lastResult.mttr}s</span>
+              )}
+            </div>
+            {lastResult.message && <div style={{ fontSize: '11px' }}>{lastResult.message}</div>}
+          </div>
         )}
+
+        {/* Remediation Audit Log */}
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+            Remediation &amp; Verification Audit Log
+          </div>
+          {actions.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px 0' }}>
+              No recovery actions executed yet in this session.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {actions.slice(0, 4).map((a) => (
+                <div
+                  key={a._id}
+                  style={{
+                    padding: '8px 12px',
+                    background: 'var(--bg-app)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '11px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>
+                      <strong className="font-mono" style={{ color: 'var(--status-info)' }}>{a.actionType?.toUpperCase()}</strong> on{' '}
+                      <em>{a.service?.name || 'checkout-service'}</em>
+                    </span>
+                    <span className={`badge ${getActionBadgeClass(a.status)}`}>
+                      {a.status === 'success' ? 'VERIFIED' : a.status}
+                    </span>
+                  </div>
+                  {a.reason && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                      {a.reason}
+                    </div>
+                  )}
+                  {a.requiresApproval && a.status === 'pending_approval' && (
+                    <button
+                      onClick={() => handleApprove(a._id)}
+                      className="btn btn-primary btn-sm"
+                      style={{ alignSelf: 'flex-start', marginTop: 4 }}
+                    >
+                      Authorize Remediation
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

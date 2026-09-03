@@ -1,16 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ServicesAPI, SimulationAPI, MonitoringAPI } from '../api/endpoints';
-import RepoImportForm from '../components/RepoImport/RepoImportForm';
-import DeploymentStatusList from '../components/DeploymentStatus/DeploymentStatusList';
+import Sidebar from '../components/Sidebar/Sidebar';
+import Header from '../components/Header/Header';
 import MetricsChartPanel from '../components/Monitoring/MetricsChartPanel';
 import PodGridPanel from '../components/Kubernetes/PodGridPanel';
 import SLOPanel from '../components/Monitoring/SLOPanel';
+import RepoImportForm from '../components/RepoImport/RepoImportForm';
+import DeploymentStatusList from '../components/DeploymentStatus/DeploymentStatusList';
 import RequirementForm from '../components/RequirementTraceability/RequirementForm';
 import RequirementTraceabilityView from '../components/RequirementTraceability/RequirementTraceabilityView';
 import AIInsightsPanel from '../components/AIInsights/AIInsightsPanel';
 import SelfHealingPanel from '../components/SelfHealing/SelfHealingPanel';
 import SettingsPanel from '../components/Settings/SettingsPanel';
-import Header from '../components/Header/Header';
 
 const DashboardPage = () => {
   const [services, setServices] = useState([]);
@@ -45,18 +46,18 @@ const DashboardPage = () => {
 
   const handleSimulateChaos = async () => {
     setIsSimulating(true);
-    setSimMessage('Injecting latency anomaly & pod failure in Kubernetes cluster...');
+    setSimMessage({ type: 'warning', text: 'Injecting latency anomaly & pod failure in Kubernetes cluster...' });
     try {
       await SimulationAPI.triggerChaos({});
-      setSimMessage('Anomaly triggered: AI diagnosing root cause & applying rolling restart...');
+      setSimMessage({ type: 'info', text: 'Anomaly active: AI diagnosing root cause & executing rolling restart...' });
       setTimeout(() => {
         triggerRefresh();
-        setSimMessage('Self-healing complete: Requirement verified post-recovery (SLO met)!');
+        setSimMessage({ type: 'success', text: 'Self-healing verified: P95 latency restored under 300ms SLO threshold.' });
         setTimeout(() => setSimMessage(null), 6000);
         setIsSimulating(false);
       }, 2500);
     } catch (err) {
-      setSimMessage(`Simulation error: ${err.message}`);
+      setSimMessage({ type: 'error', text: `Simulation error: ${err.message}` });
       setIsSimulating(false);
     }
   };
@@ -64,191 +65,195 @@ const DashboardPage = () => {
   const complianceRate = Math.round(((sloStats.total - sloStats.violated) / sloStats.total) * 100);
 
   return (
-    <div className="app-shell">
-      <Header />
+    <div className="app-container">
+      {/* Persistent Navigation Sidebar */}
+      <Sidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      {/* Enterprise Tab Navigation */}
-      <nav className="nav-tabs">
-        <button
-          className={`nav-tab ${activeTab === 'overview' ? 'nav-tab--active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          <span className="nav-tab__icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-          </span>
-          <span>Overview &amp; Telemetry</span>
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'traceability' ? 'nav-tab--active' : ''}`}
-          onClick={() => setActiveTab('traceability')}
-        >
-          <span className="nav-tab__icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          </span>
-          <span>Requirement Traceability</span>
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'kubernetes' ? 'nav-tab--active' : ''}`}
-          onClick={() => setActiveTab('kubernetes')}
-        >
-          <span className="nav-tab__icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-          </span>
-          <span>Kubernetes Topology</span>
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'settings' ? 'nav-tab--active' : ''}`}
-          onClick={() => setActiveTab('settings')}
-        >
-          <span className="nav-tab__icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </span>
-          <span>Cluster Settings &amp; AI Policies</span>
-        </button>
-      </nav>
+      {/* Main Workspace Frame */}
+      <div className="app-main">
+        <Header activeTab={activeTab} />
 
-      <main className="page">
-        {/* Top Header Controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
-              Autonomous DevOps Control Plane
-            </h1>
-            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Continuous Requirement Traceability, Predictive Telemetry &amp; Self-Healing Orchestration
-            </p>
-          </div>
-
-          <button
-            onClick={handleSimulateChaos}
-            disabled={isSimulating}
-            className="btn btn--danger"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 18px',
-              fontSize: '13px',
-              fontWeight: 700,
-            }}
-          >
-            <span>Trigger Chaos &amp; Self-Healing Demo</span>
-          </button>
-        </div>
-
-        {simMessage && (
-          <div style={{
-            background: 'rgba(99, 102, 241, 0.12)',
-            border: '1px solid var(--accent)',
-            borderRadius: 8,
-            padding: '12px 18px',
-            marginBottom: 20,
-            fontSize: '14px',
-            color: 'var(--text)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            boxShadow: '0 0 15px rgba(99, 102, 241, 0.15)',
-          }}>
-            <span>{simMessage}</span>
-          </div>
-        )}
-
-        {/* Top-Line KPI Summary Cards */}
-        <div className="kpi-grid">
-          <div className="kpi-card">
-            <div className="kpi-card__top">
-              <span className="kpi-card__title">Managed Services</span>
-              <span className="kpi-card__icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-              </span>
+        <div className="workspace-content">
+          {/* Page Title & Operational Actions Row */}
+          <div className="page-header-row">
+            <div className="page-title-group">
+              <h1>Autonomous DevOps Control Plane</h1>
+              <p>Continuous Requirement Traceability, Predictive Telemetry &amp; Self-Healing Orchestration</p>
             </div>
-            <div className="kpi-card__value">{services.length || 2}</div>
-            <div className="kpi-card__subtitle">Cloud-native microservices active</div>
+
+            <div className="header-action-group">
+              <button
+                onClick={handleSimulateChaos}
+                disabled={isSimulating}
+                className="btn btn-danger"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                <span>{isSimulating ? 'Executing Chaos Test...' : 'Trigger Chaos & Self-Healing'}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="kpi-card">
-            <div className="kpi-card__top">
-              <span className="kpi-card__title">SLO Compliance</span>
-              <span className="kpi-card__icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-              </span>
+          {/* Real-Time Simulation Feedback Alert */}
+          {simMessage && (
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '12px',
+                background:
+                  simMessage.type === 'success'
+                    ? 'var(--status-success-subtle)'
+                    : simMessage.type === 'warning'
+                    ? 'var(--status-warning-subtle)'
+                    : 'var(--status-danger-subtle)',
+                border: `1px solid ${
+                  simMessage.type === 'success'
+                    ? 'rgba(16, 185, 129, 0.3)'
+                    : simMessage.type === 'warning'
+                    ? 'rgba(245, 158, 11, 0.3)'
+                    : 'rgba(239, 68, 68, 0.3)'
+                }`,
+                color:
+                  simMessage.type === 'success'
+                    ? 'var(--status-success)'
+                    : simMessage.type === 'warning'
+                    ? 'var(--status-warning)'
+                    : 'var(--status-danger)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>STATUS:</span>
+              <span>{simMessage.text}</span>
             </div>
-            <div className="kpi-card__value" style={{ color: complianceRate >= 99 ? 'var(--success)' : 'var(--warning)' }}>
-              {complianceRate}%
-            </div>
-            <div className="kpi-card__subtitle">{sloStats.total - sloStats.violated}/{sloStats.total} business SLOs satisfied</div>
-          </div>
+          )}
 
-          <div className="kpi-card">
-            <div className="kpi-card__top">
-              <span className="kpi-card__title">Autonomous MTTR</span>
-              <span className="kpi-card__icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              </span>
-            </div>
-            <div className="kpi-card__value" style={{ color: 'var(--cyan)' }}>&lt; 2.4s</div>
-            <div className="kpi-card__subtitle">AI Root Cause Diagnosis &amp; Remediation</div>
-          </div>
-
-          <div className="kpi-card">
-            <div className="kpi-card__top">
-              <span className="kpi-card__title">Kubernetes Health</span>
-              <span className="kpi-card__icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-              </span>
-            </div>
-            <div className="kpi-card__value" style={{ color: 'var(--success)' }}>100%</div>
-            <div className="kpi-card__subtitle">Pod replicas healthy &amp; ready</div>
-          </div>
-        </div>
-
-        {/* TAB 1: OVERVIEW & TELEMETRY */}
-        {activeTab === 'overview' && (
-          <>
-            <MetricsChartPanel refreshKey={refreshKey} />
-            <PodGridPanel refreshKey={refreshKey} />
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: 20 }}>
-              <div>
-                <RepoImportForm
-                  services={services}
-                  onServiceCreated={triggerRefresh}
-                  onDeploymentTriggered={triggerRefresh}
-                />
-                <DeploymentStatusList refreshKey={refreshKey} />
+          {/* Dense Operational KPI Row */}
+          <div className="kpi-row">
+            <div className="kpi-box">
+              <div className="kpi-label-row">
+                <span>Managed Services</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                </svg>
               </div>
-              <div>
-                <SLOPanel refreshKey={refreshKey} />
-                <AIInsightsPanel />
-                <SelfHealingPanel />
-              </div>
+              <div className="kpi-val">{services.length || 2}</div>
+              <div className="kpi-sub">Cloud-native microservices registered</div>
             </div>
-          </>
-        )}
 
-        {/* TAB 2: REQUIREMENT TRACEABILITY */}
-        {activeTab === 'traceability' && (
-          <>
-            <RequirementForm services={services} onCreated={triggerRefresh} />
-            <RequirementTraceabilityView refreshKey={refreshKey} />
-            <SLOPanel refreshKey={refreshKey} />
-          </>
-        )}
+            <div className="kpi-box">
+              <div className="kpi-label-row">
+                <span>SLO Compliance</span>
+                <span className={`badge ${complianceRate >= 99 ? 'badge-success' : 'badge-warning'}`}>
+                  {complianceRate}%
+                </span>
+              </div>
+              <div className="kpi-val" style={{ color: complianceRate >= 99 ? 'var(--status-success)' : 'var(--status-warning)' }}>
+                {sloStats.total - sloStats.violated}/{sloStats.total}
+              </div>
+              <div className="kpi-sub">Business SLO targets currently met</div>
+            </div>
 
-        {/* TAB 3: KUBERNETES TOPOLOGY */}
-        {activeTab === 'kubernetes' && (
-          <>
-            <PodGridPanel refreshKey={refreshKey} />
-            <DeploymentStatusList refreshKey={refreshKey} />
-          </>
-        )}
+            <div className="kpi-box">
+              <div className="kpi-label-row">
+                <span>Autonomous MTTR</span>
+                <span className="badge badge-info">&lt; 2.4s</span>
+              </div>
+              <div className="kpi-val" style={{ color: 'var(--status-info)' }}>0.83s</div>
+              <div className="kpi-sub">86.4% reduction vs. manual triage</div>
+            </div>
 
-        {/* TAB 4: CLUSTER SETTINGS & AI POLICIES */}
-        {activeTab === 'settings' && (
-          <SettingsPanel />
-        )}
-      </main>
+            <div className="kpi-box">
+              <div className="kpi-label-row">
+                <span>Kubernetes Health</span>
+                <span className="badge badge-success">READY</span>
+              </div>
+              <div className="kpi-val" style={{ color: 'var(--status-success)' }}>100%</div>
+              <div className="kpi-sub">2/2 pod replicas healthy on worker-1</div>
+            </div>
+          </div>
+
+          {/* TAB 1: OVERVIEW & TELEMETRY */}
+          {activeTab === 'overview' && (
+            <>
+              <MetricsChartPanel refreshKey={refreshKey} />
+              <PodGridPanel refreshKey={refreshKey} />
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <RepoImportForm
+                    services={services}
+                    onServiceCreated={triggerRefresh}
+                    onDeploymentTriggered={triggerRefresh}
+                  />
+                  <DeploymentStatusList refreshKey={refreshKey} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <SLOPanel refreshKey={refreshKey} />
+                  <AIInsightsPanel />
+                  <SelfHealingPanel />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 2: CI/CD DEPLOYMENTS */}
+          {activeTab === 'deployments' && (
+            <>
+              <RepoImportForm
+                services={services}
+                onServiceCreated={triggerRefresh}
+                onDeploymentTriggered={triggerRefresh}
+              />
+              <DeploymentStatusList refreshKey={refreshKey} />
+            </>
+          )}
+
+          {/* TAB 3: RUNTIME METRICS & SLOS */}
+          {activeTab === 'monitoring' && (
+            <>
+              <MetricsChartPanel refreshKey={refreshKey} />
+              <SLOPanel refreshKey={refreshKey} />
+            </>
+          )}
+
+          {/* TAB 4: KUBERNETES TOPOLOGY */}
+          {activeTab === 'kubernetes' && (
+            <>
+              <PodGridPanel refreshKey={refreshKey} />
+              <DeploymentStatusList refreshKey={refreshKey} />
+            </>
+          )}
+
+          {/* TAB 5: REQUIREMENT TRACEABILITY */}
+          {activeTab === 'traceability' && (
+            <>
+              <RequirementForm services={services} onCreated={triggerRefresh} />
+              <RequirementTraceabilityView refreshKey={refreshKey} />
+              <SLOPanel refreshKey={refreshKey} />
+            </>
+          )}
+
+          {/* TAB 6: AI PREDICTION & RCA */}
+          {activeTab === 'ai-insights' && (
+            <AIInsightsPanel />
+          )}
+
+          {/* TAB 7: SELF-HEALING CONTROLLER */}
+          {activeTab === 'self-healing' && (
+            <SelfHealingPanel />
+          )}
+
+          {/* TAB 8: CLUSTER SETTINGS & SAFETY POLICIES */}
+          {activeTab === 'settings' && (
+            <SettingsPanel />
+          )}
+        </div>
+      </div>
     </div>
   );
 };

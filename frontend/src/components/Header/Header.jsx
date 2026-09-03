@@ -1,10 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 
-const Header = () => {
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+
+const tabTitles = {
+  overview: 'Overview & Telemetry',
+  deployments: 'CI/CD Deployments',
+  monitoring: 'Runtime Metrics & SLOs',
+  'ai-insights': 'AI Failure Prediction & RCA',
+  'self-healing': 'Self-Healing Controller',
+  kubernetes: 'Kubernetes Topology',
+  traceability: 'Requirement Traceability',
+  settings: 'Cluster Settings & Safety Policies',
+};
+
+const Header = ({ activeTab = 'overview' }) => {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const [isConnected, setIsConnected] = useState(true);
+
+  useEffect(() => {
+    const socket = io(SOCKET_URL, { reconnectionAttempts: 5 });
+    socket.on('connect', () => setIsConnected(true));
+    socket.on('disconnect', () => setIsConnected(false));
+    return () => socket.disconnect();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -15,42 +37,59 @@ const Header = () => {
   const initial = username.charAt(0).toUpperCase();
 
   return (
-    <header className="app-header">
-      <div className="app-header__left">
-        <div className="app-header__brand">
-          <div className="app-header__logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <span style={{ fontWeight: 700, letterSpacing: '-0.02em', fontSize: '16px' }}>AI DevOps Copilot</span>
+    <header className="app-topbar">
+      {/* Topbar Left: Breadcrumbs & Environment */}
+      <div className="topbar-left">
+        <div className="topbar-breadcrumb">
+          <span className="breadcrumb-root">Control Plane</span>
+          <span className="breadcrumb-sep">/</span>
+          <span className="breadcrumb-active">{tabTitles[activeTab] || 'Overview'}</span>
         </div>
-        <div className="app-header__badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399' }}>
-          <span className="app-header__pulse-dot" style={{ backgroundColor: '#10b981' }} />
-          <span style={{ fontSize: '12px', fontWeight: 600 }}>Autonomous Controller: Active</span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '11px', color: 'var(--text-muted)' }}>
+          <span>•</span>
+          <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--text-secondary)' }}>ns: default</span>
         </div>
       </div>
 
-      <div className="app-header__right">
-        <div className="app-header__user-chip">
-          <div className="app-header__avatar">
-            {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={username}
-                style={{ width: '100%', height: '100%', borderRadius: '50%' }}
-              />
-            ) : (
-              initial
-            )}
-          </div>
-          <span className="app-header__username">{username}</span>
+      {/* Topbar Right: Real-time Socket Indicator & User */}
+      <div className="topbar-right">
+        <div className="live-indicator" style={{
+          color: isConnected ? 'var(--status-success)' : 'var(--status-warning)',
+          background: isConnected ? 'var(--status-success-subtle)' : 'var(--status-warning-subtle)',
+          borderColor: isConnected ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)',
+        }}>
+          <span className="live-dot" style={{
+            background: isConnected ? 'var(--status-success)' : 'var(--status-warning)',
+            boxShadow: isConnected ? '0 0 6px var(--status-success)' : 'none',
+          }} />
+          <span>{isConnected ? 'Telemetry Live' : 'Reconnecting'}</span>
         </div>
-        <button className="btn btn--ghost" onClick={handleLogout} style={{ padding: '6px 14px', fontSize: '13px' }}>
-          Sign Out
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="user-profile-btn">
+            <div className="user-avatar-badge">
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={username}
+                  style={{ width: '100%', height: '100%', borderRadius: '3px' }}
+                />
+              ) : (
+                initial
+              )}
+            </div>
+            <span style={{ fontSize: '12px', fontWeight: 500 }}>{username}</span>
+          </div>
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={handleLogout}
+            title="Sign out of control plane"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
     </header>
   );

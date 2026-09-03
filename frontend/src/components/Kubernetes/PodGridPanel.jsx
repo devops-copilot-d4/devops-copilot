@@ -4,19 +4,19 @@ import { SimulationAPI } from '../../api/endpoints';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
-const getPodBadgeColor = (status) => {
+const getPodBadgeClass = (status) => {
   switch (status) {
     case 'Running':
-      return '#22c55e';
+      return 'badge-success';
     case 'CrashLoopBackOff':
     case 'Error':
     case 'Failed':
-      return '#ef4444';
+      return 'badge-danger';
     case 'ContainerCreating':
     case 'Terminating':
     case 'Pending':
     default:
-      return '#f59e0b';
+      return 'badge-warning';
   }
 };
 
@@ -45,71 +45,63 @@ const PodGridPanel = ({ refreshKey }) => {
   const pods = clusterInfo?.pods || [];
 
   return (
-    <div className="panel">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div>
-          <h3 style={{ margin: 0 }}>Kubernetes Cluster &amp; Pod Topology</h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
-            Namespace: <code>{clusterInfo?.namespace || 'default'}</code> | Deployment: <code>{clusterInfo?.deploymentName || 'demo-checkout-service'}</code>
-          </p>
+    <div className="data-card">
+      <div className="card-header">
+        <div className="card-header-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+          </svg>
+          <span>Kubernetes Deployment &amp; Pod Topology</span>
         </div>
-        <div>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Replicas: </span>
-          <strong style={{ color: clusterInfo?.status === 'Healthy' ? '#22c55e' : '#f59e0b' }}>
-            {clusterInfo?.availableReplicas || pods.length}/{clusterInfo?.replicas || pods.length} Healthy
-          </strong>
+        <div className="card-header-actions">
+          <span className="badge badge-neutral font-mono">
+            ns: {clusterInfo?.namespace || 'default'}
+          </span>
+          <span className={`badge ${clusterInfo?.status === 'Healthy' ? 'badge-success' : 'badge-warning'}`}>
+            Replicas: {clusterInfo?.availableReplicas || pods.length}/{clusterInfo?.replicas || pods.length}
+          </span>
         </div>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        gap: 12,
-        marginTop: 10,
-      }}>
-        {pods.map((pod) => (
-          <div
-            key={pod.name}
-            style={{
-              background: 'var(--bg)',
-              border: `1px solid ${pod.status === 'Running' ? 'var(--border)' : '#ef4444'}`,
-              borderRadius: 8,
-              padding: '12px 14px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ fontSize: '13px', fontFamily: 'monospace' }}>
-                {pod.name}
-              </strong>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: 12,
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: getPodBadgeColor(pod.status),
-                  border: `1px solid ${getPodBadgeColor(pod.status)}`,
-                }}
-              >
-                ● {pod.status}
-              </span>
-            </div>
-
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-              <span>CPU: <strong style={{ color: 'var(--text)' }}>{pod.cpu}</strong></span>
-              <span>Memory: <strong style={{ color: 'var(--text)' }}>{pod.memory}</strong></span>
-              <span>Restarts: <strong style={{ color: pod.restarts > 0 ? '#f59e0b' : 'var(--text)' }}>{pod.restarts}</strong></span>
-            </div>
-
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 4, marginTop: 2 }}>
-              Node: {pod.node || 'worker-1'} | Ready: {pod.ready || '1/1'}
-            </div>
-          </div>
-        ))}
+      <div className="data-table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Pod Name</th>
+              <th>Status</th>
+              <th>Ready</th>
+              <th>Restarts</th>
+              <th>CPU</th>
+              <th>Memory</th>
+              <th>Node</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pods.map((pod) => (
+              <tr key={pod.name}>
+                <td>
+                  <strong className="font-mono" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
+                    {pod.name}
+                  </strong>
+                </td>
+                <td>
+                  <span className={`badge ${getPodBadgeClass(pod.status)}`}>
+                    {pod.status}
+                  </span>
+                </td>
+                <td className="font-mono">{pod.ready || '1/1'}</td>
+                <td className="font-mono" style={{ color: pod.restarts > 0 ? 'var(--status-warning)' : 'inherit' }}>
+                  {pod.restarts}
+                </td>
+                <td className="font-mono">{pod.cpu}</td>
+                <td className="font-mono">{pod.memory}</td>
+                <td className="font-mono" style={{ color: 'var(--text-muted)' }}>{pod.node || 'worker-1'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
