@@ -19,23 +19,39 @@ const callLLM = async (prompt, maxTokens = 1000) => {
   }
 
   // 1. Google Gemini API
-  if (url.includes('googleapis.com') || url.includes('gemini')) {
-    const targetUrl = url.includes('key=') ? url : `${url}?key=${apiKey}`;
-    const response = await axios.post(
-      targetUrl,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.2 },
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
+  if (url.includes('googleapis.com') || url.includes('gemini') || apiKey.startsWith('AIza')) {
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+    let lastErr;
+
+    for (const model of models) {
+      try {
+        const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await axios.post(
+          targetUrl,
+          {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: maxTokens, temperature: 0.2 },
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 8000,
+          }
+        );
+        const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      } catch (err) {
+        lastErr = err;
+        if (err.response?.status !== 404) {
+          break; // Stop if not 404 (e.g. auth or quota)
+        }
       }
-    );
-    return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    }
+    throw lastErr || new Error('Gemini API call failed');
   }
+
+
 
   // 2. OpenAI / Groq format
   if (url.includes('groq.com') || url.includes('openai.com') || url.includes('/chat/completions')) {
