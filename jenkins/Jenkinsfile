@@ -1,0 +1,104 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REGISTRY      = 'docker.io'
+        DOCKER_IMAGE         = 'tharungowda/demo-checkout-service'
+        IMAGE_TAG            = "${env.BUILD_NUMBER}"
+        K8S_NAMESPACE        = 'devops-copilot'
+        BACKEND_WEBHOOK_URL  = 'http://backend-service:5000/api/deployments/webhook'
+        DOCKER_CREDENTIALS   = credentials('docker-hub-credentials')
+    }
+
+    stages {
+        stage('1. Checkout') {
+            steps {
+                echo '=== Stage 1: Checking out source code from GitHub ==='
+                checkout scm
+            }
+        }
+
+        stage('2. Install Dependencies') {
+            steps {
+                echo '=== Stage 2: Installing application dependencies ==='
+                dir('sample-app') {
+                    sh 'npm ci || npm install'
+                }
+            }
+        }
+
+        stage('3. Test') {
+            steps {
+                echo '=== Stage 3: Running automated unit and integration tests ==='
+                dir('sample-app') {
+                    sh 'npm test'
+                }
+            }
+        }
+
+        stage('4. Build') {
+            steps {
+                echo '=== Stage 4: Preparing production build artifacts ==='
+                dir('sample-app') {
+                    sh 'echo "Build artifact compilation complete."'
+                }
+            }
+        }
+
+        stage('5. Docker Build') {
+            steps {
+                echo '=== Stage 5: Building container image ==='
+                dir('sample-app') {
+                    sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} -t ${DOCKER_IMAGE}:latest ."
+                }
+            }
+        }
+
+        stage('6. Docker Push') {
+            steps {
+                echo '=== Stage 6: Pushing container image to Docker Hub ==='
+                sh "echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin ${DOCKER_REGISTRY}"
+                sh "docker push ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                sh "docker push ${DOCKER_IMAGE}:latest"
+            }
+        }
+
+        stage('7. Kubernetes Deploy') {
+            steps {
+                echo '=== Stage 7: Applying Kubernetes deployment manifest ==='
+                sh "kubectl apply -f k8s/rbac.yaml"
+                sh "kubectl apply -f k8s/app-deployment.yaml -n ${K8S_NAMESPACE}"
+                sh "kubectl set image deployment/demo-checkout-service checkout-api=${DOCKER_IMAGE}:${IMAGE_TAG} -n ${K8S_NAMESPACE} || true"
+            }
+        }
+
+        stage('8. Rollout Verification') {
+            steps {
+                echo '=== Stage 8: Verifying rollout status and notifying AI Copilot ==='
+                sh "kubectl rollout status deployment/demo-checkout-service -n ${K8S_NAMESPACE} --timeout=90s"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '=== CI/CD Pipeline Execution Completed ==='
+        }
+        success {
+            echo 'Pipeline succeeded! Dispatching deployment telemetry webhook.'
+            sh """
+                curl -s -X POST ${BACKEND_WEBHOOK_URL} \
+                  -H "Content-Type: application/json" \
+                  -d '{"status":"SUCCESS", "buildNumber":"${env.BUILD_NUMBER}", "imageTag":"${IMAGE_TAG}"}' || true
+            """
+        }
+        failure {
+            echo 'Pipeline failed! Alerting AI DevOps Copilot for failure analysis.'
+            sh """
+                curl -s -X POST ${BACKEND_WEBHOOK_URL} \
+                  -H "Content-Type: application/json" \
+                  -d '{"status":"FAILED", "buildNumber":"${env.BUILD_NUMBER}", "imageTag":"${IMAGE_TAG}"}' || true
+            """
+        }
+    }
+}

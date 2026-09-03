@@ -1,118 +1,70 @@
-﻿const RecoveryAction = require('../models/RecoveryAction');
+const RecoveryAction = require('../models/RecoveryAction');
 const Incident = require('../models/Incident');
 const Service = require('../models/Service');
-const SLO = require('../models/SLO');
-const k8sService = require('../services/k8s.service');
-const { checkSLO } = require('../services/prometheus.service');
-const { explainRecoveryDecision } = require('../services/llm.service');
-const { emitEvent } = require('../services/socket.service');
+const recoveryService = require('../services/recovery.service');
 
-// High-impact action types require human approval before execution
+// High-impact action types that can optionally require human approval
 const HIGH_IMPACT_ACTIONS = ['rollback', 'scale_down'];
 
-// Create a recovery action for an incident (does not execute it yet if it
-// requires approval)
+/**
+ * Trigger an autonomous or user-initiated self-healing recovery action.
+ * Evaluates safety constraints, executes K8s API operation, and runs verification.
+ */
 const createRecoveryAction = async (req, res, next) => {
   try {
-    const { incidentId, actionType, businessImpact } = req.body;
+    const { incidentId, serviceId, actionType, deploymentName, namespace, reason, rootCause } = req.body;
 
-    const incident = await Incident.findById(incidentId).populate('service');
-    if (!incident) return res.status(404).json({ message: 'Incident not found' });
+    let targetDeployment = deploymentName || 'demo-checkout-service';
+    let targetNamespace = namespace || 'default';
+    let targetServiceId = serviceId;
 
-    const reason = await explainRecoveryDecision({
-      rootCause: incident.rootCause,
-      actionType,
-      businessImpact: businessImpact || 'unspecified',
-    });
-
-    const requiresApproval = HIGH_IMPACT_ACTIONS.includes(actionType);
-
-    const action = await RecoveryAction.create({
-      incident: incident._id,
-      service: incident.service._id,
-      actionType,
-      reason,
-      requiresApproval,
-      status: requiresApproval ? 'pending_approval' : 'executing',
-    });
-
-    emitEvent('recovery:new', { actionId: action._id, actionType, requiresApproval });
-
-    if (!requiresApproval) {
-      await executeAction(action);
+    if (incidentId) {
+      const incident = await Incident.findById(incidentId).populate('service');
+      if (incident && incident.service) {
+        targetDeployment = incident.service.deploymentName || targetDeployment;
+        targetNamespace = incident.service.namespace || targetNamespace;
+        targetServiceId = incident.service._id;
+      }
     }
 
-    res.status(201).json(action);
+    const result = await recoveryService.executeRecovery({
+      serviceId: targetServiceId,
+      deploymentName: targetDeployment,
+      namespace: targetNamespace,
+      actionType: actionType || 'RESTART',
+      rootCause: rootCause || 'AI DevOps Copilot automated detection',
+      reason: reason || 'Self-healing triggered based on failure diagnosis',
+      incidentId,
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
   } catch (err) {
     next(err);
   }
 };
 
-// Human approves a pending high-impact recovery action
+// Human approves a pending recovery action
 const approveRecoveryAction = async (req, res, next) => {
   try {
-    const action = await RecoveryAction.findById(req.params.id);
+    const action = await RecoveryAction.findById(req.params.id).populate('service');
     if (!action) return res.status(404).json({ message: 'Recovery action not found' });
 
-    action.approvedBy = req.user.id;
+    action.approvedBy = req.user ? req.user.id : 'admin';
     action.status = 'executing';
     await action.save();
 
-    await executeAction(action);
+    const result = await recoveryService.executeRecovery({
+      serviceId: action.service ? action.service._id : null,
+      deploymentName: action.service ? action.service.deploymentName : 'demo-checkout-service',
+      namespace: action.service ? action.service.namespace : 'default',
+      actionType: action.actionType,
+      reason: action.reason,
+      incidentId: action.incident,
+    });
 
-    res.json(action);
+    res.json(result);
   } catch (err) {
     next(err);
-  }
-};
-
-// Internal helper: run the K8s action, then verify against the requirement/SLO
-const executeAction = async (action) => {
-  const service = await Service.findById(action.service);
-
-  const params = { deploymentName: service.deploymentName, namespace: service.namespace };
-
-  try {
-    switch (action.actionType) {
-      case 'restart':
-        await k8sService.restartDeployment(params);
-        break;
-      case 'rollback':
-        await k8sService.rollbackDeployment(params);
-        break;
-      case 'scale_up':
-        await k8sService.scaleDeployment({ ...params, replicas: 3 });
-        break;
-      case 'scale_down':
-        await k8sService.scaleDeployment({ ...params, replicas: 1 });
-        break;
-      case 'alert_only':
-      default:
-        break; // no K8s action, just an alert
-    }
-
-    // Post-recovery verification: re-check the SLO tied to this incident's
-    // service, not just pod health, per the requirement-aware design.
-    const slo = await SLO.findOne({ }).populate('metric'); // TODO: scope to incident's SLO precisely
-    let verified = false;
-    if (slo?.metric?.queryExpression) {
-      const result = await checkSLO({
-        queryExpression: slo.metric.queryExpression,
-        threshold: slo.threshold,
-        comparator: slo.comparator,
-      });
-      verified = result.status === 'met';
-    }
-
-    action.status = 'success';
-    action.requirementVerified = verified;
-    await action.save();
-
-    emitEvent('recovery:update', { actionId: action._id, status: 'success', verified });
-  } catch (err) {
-    action.status = 'failed';
-    await action.save();
-    emitEvent('recovery:update', { actionId: action._id, status: 'failed' });
   }
 };
 
@@ -125,5 +77,8 @@ const getRecoveryActions = async (req, res, next) => {
   }
 };
 
-module.exports = { createRecoveryAction, approveRecoveryAction, getRecoveryActions };
-
+module.exports = {
+  createRecoveryAction,
+  approveRecoveryAction,
+  getRecoveryActions,
+};

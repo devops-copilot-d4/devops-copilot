@@ -27,7 +27,12 @@ app.use(express.json());
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'AI-Driven DevOps Platform API is running' });
+  res.json({
+    message: 'AI DevOps Copilot API is running',
+    title: 'AI DevOps Copilot – AI Agent for Autonomous CI/CD Failure Prediction and Self-Healing',
+    team: ['Tharun Gowda K', 'Vikas S', 'Vishnu M', 'Yashwanth P'],
+    status: 'online',
+  });
 });
 
 // Routes

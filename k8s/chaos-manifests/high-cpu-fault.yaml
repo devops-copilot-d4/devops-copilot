@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-checkout-service
+  namespace: devops-copilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-checkout-service
+  template:
+    metadata:
+      labels:
+        app: demo-checkout-service
+    spec:
+      containers:
+        - name: checkout-api
+          image: tharungowda/demo-checkout-service:v1.0.0
+          command: ["node", "-e", "while(true){ Math.sqrt(Math.random()); }"]
+          resources:
+            limits:
+              cpu: "100m"

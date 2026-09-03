@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-checkout-service
+  namespace: devops-copilot
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: demo-checkout-service
+  template:
+    metadata:
+      labels:
+        app: demo-checkout-service
+    spec:
+      containers:
+        - name: checkout-api
+          image: tharungowda/demo-checkout-service:v1.0.0
+          command: ["node", "-e", "const arr=[]; while(true){ arr.push(Buffer.alloc(10*1024*1024)); }"]
+          resources:
+            limits:
+              memory: "64Mi"

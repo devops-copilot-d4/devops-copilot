@@ -18,12 +18,12 @@ const Header = () => {
     <header className="app-header">
       <div className="app-header__left">
         <div className="app-header__brand">
-          <div className="app-header__logo-icon">⚡</div>
-          <span>DevOps Copilot</span>
+          <div className="app-header__logo-icon">🤖</div>
+          <span>AI DevOps Copilot</span>
         </div>
         <div className="app-header__badge">
           <span className="app-header__pulse-dot" />
-          <span>Production (k8s-us-east-1)</span>
+          <span>K8s Self-Healing Controller: Active</span>
         </div>
       </div>
 

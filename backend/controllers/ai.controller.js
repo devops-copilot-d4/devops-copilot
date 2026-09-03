@@ -1,9 +1,46 @@
-﻿const Incident = require('../models/Incident');
+const Incident = require('../models/Incident');
 const Deployment = require('../models/Deployment');
+const aiClient = require('../services/aiService.client');
 const { analyzeRootCause } = require('../services/llm.service');
 const { emitEvent } = require('../services/socket.service');
 
-// Run RCA on a deployment's logs and create an Incident record
+// 1. Numerical ML Failure Prediction
+const predictFailure = async (req, res, next) => {
+  try {
+    const telemetry = req.body;
+    const result = await aiClient.predict(telemetry);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 2. Hybrid AI DevOps Copilot Diagnosis (ML + Structured LLM RCA)
+const runCopilotDiagnosis = async (req, res, next) => {
+  try {
+    const { serviceName, namespace, telemetry, logs, events, recentDeploymentInfo } = req.body;
+    const diagnosis = await aiClient.analyzeCopilotState({
+      serviceName: serviceName || 'demo-checkout-service',
+      namespace: namespace || 'default',
+      telemetry: telemetry || {
+        cpu_usage: 45,
+        memory_usage: 50,
+        restart_count: 0,
+        error_rate: 0,
+        pod_status: 'Running',
+      },
+      logs: logs || '',
+      events: events || '',
+      recentDeploymentInfo: recentDeploymentInfo || 'v1.0.0',
+    });
+
+    res.json(diagnosis);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 3. Log-specific Root Cause Analysis on a deployment
 const runRootCauseAnalysis = async (req, res, next) => {
   try {
     const { deploymentId, events, metricsSummary } = req.body;
@@ -43,5 +80,9 @@ const getIncidents = async (req, res, next) => {
   }
 };
 
-module.exports = { runRootCauseAnalysis, getIncidents };
-
+module.exports = {
+  predictFailure,
+  runCopilotDiagnosis,
+  runRootCauseAnalysis,
+  getIncidents,
+};

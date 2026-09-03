@@ -23,6 +23,8 @@ export const MonitoringAPI = {
 };
 
 export const AIInsightsAPI = {
+  predict: (telemetry) => api.post('/ai/predict', telemetry),
+  copilotDiagnose: (data) => api.post('/ai/copilot/diagnose', data),
   runRCA: (data) => api.post('/ai/rca', data),
   incidents: () => api.get('/ai/incidents'),
 };
@@ -38,5 +40,3 @@ export const SimulationAPI = {
   getPods: (params) => api.get('/simulation/pods', { params }),
   triggerChaos: (data) => api.post('/simulation/chaos', data),
 };
-
-
