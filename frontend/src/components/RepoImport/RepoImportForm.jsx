@@ -1,23 +1,12 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ServicesAPI, DeploymentsAPI } from '../../api/endpoints';
 
-const RepoImportForm = () => {
-  const [services, setServices] = useState([]);
+const RepoImportForm = ({ services = [], onServiceCreated }) => {
   const [name, setName] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [commitSha, setCommitSha] = useState('');
   const [status, setStatus] = useState(null);
-
-  const loadServices = () => {
-    ServicesAPI.list()
-      .then((res) => setServices(res.data))
-      .catch(() => setServices([]));
-  };
-
-  useEffect(() => {
-    loadServices();
-  }, []);
 
   const handleCreateService = async (e) => {
     e.preventDefault();
@@ -26,7 +15,7 @@ const RepoImportForm = () => {
       setStatus(`Service created: ${res.data.name}`);
       setName('');
       setRepoUrl('');
-      loadServices();
+      if (onServiceCreated) onServiceCreated();
       setSelectedServiceId(res.data._id);
     } catch (err) {
       setStatus(`Error creating service: ${err.response?.data?.message || err.message}`);
@@ -90,4 +79,4 @@ const RepoImportForm = () => {
   );
 };
 
-export default RepoImportForm;
+export default RepoImportForm;
