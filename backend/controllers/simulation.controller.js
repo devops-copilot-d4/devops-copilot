@@ -11,6 +11,17 @@ const recoveryService = require('../services/recovery.service');
 const { predictFailureTrend } = require('../services/prediction.service');
 const { emitEvent } = require('../services/socket.service');
 
+// Synthetic fixtures are only available when an operator explicitly enables
+// demo mode. They are never a production telemetry fallback.
+const assertSimulationMode = () => {
+  if (process.env.SIMULATION_MODE !== 'true') {
+    const error = new Error('Simulation mode is disabled. Use authoritative Kubernetes and Prometheus endpoints.');
+    error.code = 'SIMULATION_DISABLED';
+    error.statusCode = 403;
+    throw error;
+  }
+};
+
 // Generate 15 baseline time-series points
 let metricStream = Array.from({ length: 15 }, (_, i) => {
   const time = new Date(Date.now() - (15 - i) * 10000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -25,6 +36,7 @@ let metricStream = Array.from({ length: 15 }, (_, i) => {
 // GET /api/simulation/metrics
 const getLiveMetrics = async (req, res, next) => {
   try {
+    assertSimulationMode();
     const latencies = metricStream.map((p) => p.latency);
     const prediction = predictFailureTrend({
       metricHistory: latencies,
@@ -46,6 +58,7 @@ const getLiveMetrics = async (req, res, next) => {
 // GET /api/simulation/pods
 const getPodTelemetry = async (req, res, next) => {
   try {
+    assertSimulationMode();
     const deploymentName = req.query.deploymentName || 'demo-checkout-service';
     const namespace = req.query.namespace || 'default';
     const status = await k8sService.getDeploymentStatus({ deploymentName, namespace });
@@ -58,6 +71,7 @@ const getPodTelemetry = async (req, res, next) => {
 // POST /api/simulation/chaos — Full Real E2E AI-Driven Self-Healing Loop
 const triggerChaosSpike = async (req, res, next) => {
   try {
+    assertSimulationMode();
     // 1. Ensure Target Service Document exists
     let service = await Service.findOne({
       $or: [

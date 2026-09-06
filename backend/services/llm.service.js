@@ -3,13 +3,21 @@ const axios = require('axios');
 const LLM_API_URL = process.env.LLM_API_URL;
 const LLM_API_KEY = process.env.LLM_API_KEY;
 
+const llmUnavailable = (message, cause) => {
+  const error = new Error(message);
+  error.code = 'LLM_UNAVAILABLE';
+  error.statusCode = 503;
+  error.cause = cause;
+  return error;
+};
+
 // Universal LLM caller supporting Google Gemini, Anthropic, and OpenAI/Groq
 const callLLM = async (prompt, maxTokens = 1000) => {
   const rawUrl = (process.env.LLM_API_URL || '').trim().replace(/^["']|["']$/g, '');
   const apiKey = (process.env.LLM_API_KEY || '').trim().replace(/^["']|["']$/g, '');
 
   if (!apiKey) {
-    throw new Error('LLM_API_KEY is not configured');
+    throw llmUnavailable('LLM_API_KEY is not configured');
   }
 
   // Determine standard Gemini URL if generic or malformed
@@ -102,39 +110,6 @@ const extractJSON = (rawText) => {
   return JSON.parse(rawText.replace(/```json|```/g, '').trim());
 };
 
-// Fallback rule-based SLO generator when API key is unavailable or fails
-const fallbackRequirementToSLO = (text) => {
-  const lower = text.toLowerCase();
-  const numMatch = lower.match(/\b\d+(\.\d+)?\b/);
-  const threshold = numMatch ? parseFloat(numMatch[0]) : 300;
-
-  if (lower.includes('%') || lower.includes('uptime') || lower.includes('availability') || lower.includes('success rate')) {
-    return {
-      metricName: 'service_availability_ratio',
-      comparator: '>=',
-      threshold: threshold || 99.9,
-      unit: '%',
-    };
-  }
-
-  if (lower.includes('error') || lower.includes('failure') || lower.includes('fault')) {
-    return {
-      metricName: 'http_error_rate_percentage',
-      comparator: '<',
-      threshold: threshold || 1,
-      unit: '%',
-    };
-  }
-
-  // Default to latency / response time
-  return {
-    metricName: 'http_request_duration_seconds',
-    comparator: '<',
-    threshold: threshold || 300,
-    unit: lower.includes('second') || lower.includes('sec') ? 's' : 'ms',
-  };
-};
-
 // Requirement Analyzer: NL requirement -> draft measurable SLO (JSON)
 const requirementToSLO = async (requirementText) => {
   try {
@@ -149,9 +124,7 @@ Requirement: "${requirementText}"
     const raw = await callLLM(prompt, 300);
     return extractJSON(raw);
   } catch (err) {
-    const slo = fallbackRequirementToSLO(requirementText);
-    console.log(`[llm.service] Requirement analyzed -> drafted SLO: ${slo.comparator} ${slo.threshold} ${slo.unit}`);
-    return slo;
+    throw llmUnavailable(`LLM requirement analysis unavailable: ${err.message}`, err);
   }
 };
 
@@ -179,12 +152,7 @@ ${metricsSummary}
     const raw = await callLLM(prompt, 500);
     return extractJSON(raw);
   } catch (err) {
-    console.log('[llm.service] RCA analysis complete: rootCause identified.');
-    return {
-      rootCause: 'Connection backlog and memory consumption exceeded configured container limits',
-      confidence: 0.82,
-      suggestedAction: 'restart',
-    };
+    throw llmUnavailable(`LLM root-cause analysis unavailable: ${err.message}`, err);
   }
 };
 
@@ -199,12 +167,11 @@ Write for a non-technical stakeholder reading a dashboard.
 
     return await callLLM(prompt, 200);
   } catch (err) {
-    console.log(`[llm.service] Generated explainability rationale for action: ${actionType}`);
-    return `The ${actionType} action was executed to remediate '${rootCause}'. This directly mitigates business risk ('${businessImpact}') and restores the operational Service Level Objective.`;
+    throw llmUnavailable(`LLM explainability unavailable: ${err.message}`, err);
   }
 };
 
-module.exports = { requirementToSLO, analyzeRootCause, explainRecoveryDecision };
+module.exports = { requirementToSLO, analyzeRootCause, explainRecoveryDecision, llmUnavailable };
 
 
 

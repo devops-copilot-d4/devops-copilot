@@ -5,44 +5,8 @@ from typing import Optional
 from config import settings
 from models.schemas import CompactContextBundle, CopilotDiagnosisResponse
 
-# Pre-defined recovery policy rules
-RECOVERY_POLICIES = {
-    "CrashLoopBackOff": {
-        "recommended_action": "ROLLBACK",
-        "likely_cause": "Application configuration failure or unhandled startup crash post-deployment",
-        "reason": "Repeated container crashes detected immediately following deployment rollout; rolling back to the last stable revision restores availability."
-    },
-    "OOMKilled": {
-        "recommended_action": "SCALE",
-        "likely_cause": "Memory limit exceeded by application heap growth under traffic",
-        "reason": "Container terminated due to memory pressure exceeding cgroup limits; scaling replicas or resource quotas mitigates OOM conditions."
-    },
-    "High CPU": {
-        "recommended_action": "SCALE",
-        "likely_cause": "CPU saturation causing latency degradation and queued requests",
-        "reason": "Sustained high CPU utilization (>85%) requires horizontal scaling of deployment replicas to distribute load."
-    },
-    "Failed deployment": {
-        "recommended_action": "ROLLBACK",
-        "likely_cause": "Container image pull failure or invalid manifest rollout specification",
-        "reason": "New deployment failed to reach ready state; rolling back to prior known-good deployment revision."
-    },
-    "Application health failure": {
-        "recommended_action": "RESTART",
-        "likely_cause": "Deadlock or degraded internal worker threads failing health probes",
-        "reason": "Pods failing liveness/readiness probes while resources are normal; a rolling restart resets runtime state."
-    },
-    "Configuration error": {
-        "recommended_action": "ROLLBACK",
-        "likely_cause": "Missing or malformed ConfigMap / Secret environment variable",
-        "reason": "Container failed during initialization due to missing environment bindings; rolling back to last functioning configuration."
-    },
-    "Normal": {
-        "recommended_action": "NO ACTION",
-        "likely_cause": "System operating within normal baseline parameters",
-        "reason": "Telemetry and logs indicate healthy service operation; no self-healing action required."
-    }
-}
+class LLMUnavailableError(RuntimeError):
+    pass
 
 async def call_llm(prompt: str) -> Optional[str]:
     api_key = settings.LLM_API_KEY
@@ -157,20 +121,4 @@ RULES:
             context_summary=bundle.model_dump()
         )
         
-    # Rule-Based Policy Fallback (Guarantees zero downtime and viva-friendly robustness)
-    failure_type = bundle.predicted_failure_type
-    policy = RECOVERY_POLICIES.get(failure_type, RECOVERY_POLICIES["Normal"])
-    
-    if bundle.ml_risk_level == "LOW":
-        policy = RECOVERY_POLICIES["Normal"]
-        
-    return CopilotDiagnosisResponse(
-        risk=bundle.ml_risk_level,
-        failure_type=failure_type,
-        probability=bundle.ml_failure_probability,
-        likely_cause=policy["likely_cause"],
-        recommended_action=policy["recommended_action"],
-        reason=policy["reason"],
-        confidence=0.91 if bundle.ml_risk_level == "HIGH" else 0.85,
-        context_summary=bundle.model_dump()
-    )
+    raise LLMUnavailableError("LLM analysis unavailable or returned an invalid response.")

@@ -5,164 +5,75 @@ const k8sService = require('../services/k8s.service');
 const { emitEvent } = require('../services/socket.service');
 const { parseRepoUrl, triggerWorkflowDispatch, getLatestWorkflowRuns } = require('../services/github.service');
 
-// Background polling for GitHub Actions workflow run progress
+const workflowState = (run) => {
+  if (!run || run.status !== 'completed') return { buildStatus: 'building', deployStatus: 'pending' };
+  return run.conclusion === 'success'
+    ? { buildStatus: 'success', deployStatus: 'pending' }
+    : { buildStatus: 'failed', deployStatus: 'failed' };
+};
+
+const updateDeployment = async (deployment, state) => {
+  deployment.buildStatus = state.buildStatus;
+  deployment.deployStatus = state.deployStatus;
+  await deployment.save();
+  emitEvent('deployment:update', { deploymentId: deployment._id, ...state, deployment });
+};
+
 const pollWorkflowStatus = async (deploymentId, accessToken, owner, repo, triggeredAt) => {
   let attempts = 0;
-  const maxAttempts = 30; // poll every 10s up to 5 mins
-
   const interval = setInterval(async () => {
-    attempts++;
+    attempts += 1;
     try {
       const runs = await getLatestWorkflowRuns(accessToken, owner, repo);
-      // Find the workflow run created around or after our dispatch
-      const targetRun = runs.find((r) => new Date(r.created_at) >= new Date(triggeredAt.getTime() - 15000));
-
-      if (targetRun) {
-        let buildStatus = targetRun.status === 'completed'
-          ? (targetRun.conclusion === 'success' ? 'success' : 'failed')
-          : 'building';
-
+      const run = runs.find((candidate) => new Date(candidate.created_at) >= new Date(triggeredAt.getTime() - 15000));
+      if (run) {
         const deployment = await Deployment.findById(deploymentId).populate('service');
         if (deployment) {
-          deployment.buildStatus = buildStatus;
-
-          if (buildStatus === 'success') {
-            clearInterval(interval);
-            deployment.deployStatus = 'deploying';
-            await deployment.save();
-            emitEvent('deployment:update', {
-              deploymentId: deployment._id,
-              buildStatus: 'success',
-              deployStatus: 'deploying',
-              deployment,
-            });
-
-            // Trigger K8s deployment step (stub)
-            await k8sService.deployService({
-              deploymentName: deployment.service?.deploymentName,
-              namespace: deployment.service?.namespace,
-              imageName: deployment.service?.imageName || 'devops-copilot-backend:latest',
-            });
-
-            deployment.deployStatus = 'running';
-            await deployment.save();
-            emitEvent('deployment:update', {
-              deploymentId: deployment._id,
-              buildStatus: 'success',
-              deployStatus: 'running',
-              deployment,
-            });
-          } else if (buildStatus === 'failed') {
-            clearInterval(interval);
-            deployment.deployStatus = 'failed';
-            await deployment.save();
-            emitEvent('deployment:update', {
-              deploymentId: deployment._id,
-              buildStatus: 'failed',
-              deployStatus: 'failed',
-              deployment,
-            });
-          } else {
-            await deployment.save();
-            emitEvent('deployment:update', {
-              deploymentId: deployment._id,
-              buildStatus: 'building',
-              deployStatus: deployment.deployStatus,
-              deployment,
-            });
-          }
+          const state = workflowState(run);
+          await updateDeployment(deployment, state);
+          if (run.status === 'completed') clearInterval(interval);
         }
       }
-
-      if (attempts >= maxAttempts) {
-        clearInterval(interval);
-      }
     } catch (err) {
-      console.error('Error polling workflow run:', err.message);
-      if (attempts >= maxAttempts) {
-        clearInterval(interval);
-      }
+      const deployment = await Deployment.findById(deploymentId);
+      if (deployment) await updateDeployment(deployment, { buildStatus: 'failed', deployStatus: 'failed' });
+      clearInterval(interval);
     }
+    if (attempts >= 30) clearInterval(interval);
   }, 10000);
 };
 
-// Local / Kubernetes direct rollout pipeline
-const simulateLocalRollout = (deploymentId, service) => {
-  setTimeout(async () => {
-    try {
-      const deployment = await Deployment.findById(deploymentId).populate('service');
-      if (!deployment) return;
-
-      deployment.buildStatus = 'building';
-      deployment.deployStatus = 'deploying';
-      await deployment.save();
-      emitEvent('deployment:update', { deploymentId, buildStatus: 'building', deployStatus: 'deploying', deployment });
-
-      // Step 2: Deploy to Kubernetes
-      setTimeout(async () => {
-        try {
-          await k8sService.deployService({
-            deploymentName: service.deploymentName || service.name || 'demo-checkout-service',
-            namespace: service.namespace || 'default',
-            imageName: service.imageName || 'app:stable-latest',
-          });
-        } catch (k8sErr) {
-          console.warn('[deployment.controller] k8s deploy notice:', k8sErr.message);
-        }
-
-        deployment.buildStatus = 'success';
-        deployment.deployStatus = 'running';
-        await deployment.save();
-        emitEvent('deployment:update', { deploymentId, buildStatus: 'success', deployStatus: 'running', deployment });
-      }, 1200);
-    } catch (e) {
-      console.error('[simulateLocalRollout] error:', e.message);
-    }
-  }, 800);
-};
-
-// Triggered when a user imports a repo / pushes code.
 const triggerDeployment = async (req, res, next) => {
   try {
     const { serviceId, commitSha } = req.body;
-
     const service = await Service.findById(serviceId);
     if (!service) return res.status(404).json({ message: 'Service not found' });
 
     const deployment = await Deployment.create({
       service: serviceId,
-      triggeredBy: req.user ? req.user.id : null,
-      commitSha: commitSha || 'bbae1bf',
+      triggeredBy: req.user.id,
+      commitSha: commitSha || null,
       buildStatus: 'queued',
       deployStatus: 'pending',
     });
+    emitEvent('deployment:update', { deploymentId: deployment._id, buildStatus: 'queued', deployStatus: 'pending', deployment });
 
-    emitEvent('deployment:update', {
-      deploymentId: deployment._id,
-      buildStatus: 'queued',
-      deployStatus: 'pending',
-      deployment,
-    });
-
-    // Fire-and-forget: Trigger GitHub Actions workflow_dispatch if configured
-    const user = req.user ? await User.findById(req.user.id) : null;
+    const user = await User.findById(req.user.id);
     const repoInfo = parseRepoUrl(service.repoUrl);
-
-    if (user?.accessToken && repoInfo) {
-      const triggeredAt = new Date();
-      triggerWorkflowDispatch(user.accessToken, repoInfo.owner, repoInfo.repo)
-        .then(() => {
-          pollWorkflowStatus(deployment._id, user.accessToken, repoInfo.owner, repoInfo.repo, triggeredAt);
-        })
-        .catch((err) => {
-          console.warn('[deployment.controller] GitHub Actions dispatch notice:', err.response?.data?.message || err.message);
-          simulateLocalRollout(deployment._id, service);
-        });
-    } else {
-      simulateLocalRollout(deployment._id, service);
+    if (!user?.accessToken || !repoInfo) {
+      await updateDeployment(deployment, { buildStatus: 'failed', deployStatus: 'failed' });
+      return res.status(503).json({ message: 'GitHub workflow dispatch is not configured for this service.', code: 'WORKFLOW_UNAVAILABLE', deployment });
     }
 
-    res.status(201).json(deployment);
+    try {
+      const triggeredAt = new Date();
+      await triggerWorkflowDispatch(user.accessToken, repoInfo.owner, repoInfo.repo);
+      pollWorkflowStatus(deployment._id, user.accessToken, repoInfo.owner, repoInfo.repo, triggeredAt);
+      return res.status(201).json(deployment);
+    } catch (err) {
+      await updateDeployment(deployment, { buildStatus: 'failed', deployStatus: 'failed' });
+      return res.status(502).json({ message: `GitHub workflow dispatch failed: ${err.message}`, code: 'WORKFLOW_DISPATCH_FAILED', deployment });
+    }
   } catch (err) {
     next(err);
   }
@@ -170,13 +81,6 @@ const triggerDeployment = async (req, res, next) => {
 
 const getDeployments = async (req, res, next) => {
   try {
-    // Auto-resolve any legacy pending deployments older than 15 seconds
-    const staleThreshold = new Date(Date.now() - 15000);
-    await Deployment.updateMany(
-      { deployStatus: 'pending', createdAt: { $lt: staleThreshold } },
-      { $set: { deployStatus: 'running', buildStatus: 'success' } }
-    );
-
     const deployments = await Deployment.find().populate('service').sort({ createdAt: -1 });
     res.json(deployments);
   } catch (err) {
@@ -188,17 +92,11 @@ const getDeploymentStatus = async (req, res, next) => {
   try {
     const deployment = await Deployment.findById(req.params.id).populate('service');
     if (!deployment) return res.status(404).json({ message: 'Deployment not found' });
-
-    const liveStatus = await k8sService.getDeploymentStatus({
-      deploymentName: deployment.service.deploymentName,
-      namespace: deployment.service.namespace,
-    });
-
+    const liveStatus = await k8sService.getDeploymentStatus({ deploymentName: deployment.service.deploymentName, namespace: deployment.service.namespace });
     res.json({ deployment, liveStatus });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { triggerDeployment, getDeployments, getDeploymentStatus };
-
+module.exports = { triggerDeployment, getDeployments, getDeploymentStatus, workflowState };

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from models.schemas import CopilotAnalysisRequest, CopilotDiagnosisResponse
 from services.ml_predictor import ml_predictor
 from services.log_bundler import create_compact_context_bundle
-from services.llm_agent import diagnose_failure
+from services.llm_agent import diagnose_failure, LLMUnavailableError
 
 router = APIRouter(tags=["AI DevOps Copilot"])
 
@@ -30,6 +30,8 @@ async def analyze_copilot_state(request: CopilotAnalysisRequest):
         diagnosis = await diagnose_failure(context_bundle)
         return diagnosis
         
+    except LLMUnavailableError as e:
+        raise HTTPException(status_code=503, detail={"code": "LLM_UNAVAILABLE", "message": str(e)})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Copilot analysis failed: {str(e)}")
 

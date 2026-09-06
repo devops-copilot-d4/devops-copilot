@@ -13,6 +13,8 @@ async def predict_failure(telemetry: TelemetryPayload):
     """
     try:
         return ml_predictor.predict(telemetry)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail={"code": "ML_MODEL_UNAVAILABLE", "message": str(e)})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

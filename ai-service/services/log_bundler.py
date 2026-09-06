@@ -48,7 +48,7 @@ def create_compact_context_bundle(
     extracted = clean_and_deduplicate_logs(logs)
     
     return CompactContextBundle(
-        pod_status=telemetry.pod_status,
+        pod_status="not provided to the ML predictor",
         recent_deployment=recent_deployment_info or "latest",
         restart_count=telemetry.restart_count,
         extracted_errors=extracted,

@@ -1,273 +1,216 @@
-// Kubernetes integration layer & Cluster State Manager.
-// Provides direct live Kubernetes REST API bindings with automatic fallback
-// for local demo, chaos engineering, and self-healing verification.
-
 const axios = require('axios');
+const fs = require('fs');
 const https = require('https');
 
-const K8S_API_URL = process.env.K8S_API_URL || 'https://host.docker.internal:51810';
-const K8S_TOKEN = process.env.K8S_TOKEN || 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkNIc0g2YlFzOXd3RVAzeTFXcUhLQkJSaU0wQVE2cGdMSW5CZG8tUFktSHMifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiXSwiZXhwIjoxODE5OTY0MzE0LCJpYXQiOjE3ODg0MjgzMTQsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiYmMwODhiZTQtMWJlMS00NGM1LWJiMDgtZDI4Mjg5Zjg2YTJmIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJkZXZvcHMtY29waWxvdCIsInNlcnZpY2VhY2NvdW50Ijp7Im5hbWUiOiJkZXZvcHMtY29waWxvdC1zYSIsInVpZCI6ImYxMjVmOTc3LWQ0YzUtNDc1Yi1hYWI1LTc4ODZkYjE2ZmQ0ZiJ9fSwibmJmIjoxNzg4NDI4MzE0LCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGV2b3BzLWNvcGlsb3Q6ZGV2b3BzLWNvcGlsb3Qtc2EifQ.tQm2eioiPeAyJnVvXJLcSRuMv3aDEqpnAVW7LDmQ-IJad1BW7uUGQSSb5_zRyXYTH9VZ8D9A64CPrynsTmapVOIQ3u3ZA4xG5za4v1c4ExwwNN1s_7BDrx0lg4F2qXkZTRS7MPKDvlK-rXc0QAFWRXkitB9GkcnwCxMqELsZCpD5NEiyD9JQzlmpLZF8HOEXGntk2Jx3pUoEDYiC8RS5PxUPheInlMEJK9uYDVkzDZ2dUPQeI2Pjg0wMSd1QMssobYycKGVJmCh9T4IXl4Yqt4kfLEncXN49__z2la6aos3EyO29OJRip38a4lwagDvqErbY8NUf7Gql47XTVYn7sA';
+const SERVICE_ACCOUNT_DIR = '/var/run/secrets/kubernetes.io/serviceaccount';
 
-const k8sClient = axios.create({
-  baseURL: K8S_API_URL,
-  headers: {
-    Authorization: `Bearer ${K8S_TOKEN}`,
-  },
-  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-  timeout: 5000,
-});
-
-const podRegistry = new Map();
-
-// Helper to generate realistic K8s pod names
-const generatePodName = (deploymentName) => {
-  const hash = Math.random().toString(36).substring(2, 7);
-  const rand = Math.random().toString(36).substring(2, 7);
-  return `${deploymentName || 'service'}-${hash}-${rand}`;
+const infrastructureError = (message, cause) => {
+  const error = new Error(message);
+  error.code = 'KUBERNETES_UNAVAILABLE';
+  error.statusCode = 503;
+  error.cause = cause;
+  return error;
 };
 
-// Calculate human-readable age
+const getClient = () => {
+  const configuredUrl = process.env.K8S_API_URL;
+  const configuredToken = process.env.K8S_TOKEN;
+  const inCluster = fs.existsSync(`${SERVICE_ACCOUNT_DIR}/token`);
+  if (!configuredUrl && !inCluster) throw infrastructureError('Kubernetes API is not configured. Set K8S_API_URL and K8S_TOKEN, or run in a Kubernetes pod.');
+
+  let token = configuredToken;
+  let ca;
+  if (inCluster && !token) {
+    token = fs.readFileSync(`${SERVICE_ACCOUNT_DIR}/token`, 'utf8').trim();
+    ca = fs.readFileSync(`${SERVICE_ACCOUNT_DIR}/ca.crt`);
+  }
+  if (!token) throw infrastructureError('Kubernetes authentication is not configured. Set K8S_TOKEN or use an in-cluster service account.');
+
+  return axios.create({
+    baseURL: configuredUrl || 'https://kubernetes.default.svc',
+    headers: { Authorization: `Bearer ${token}` },
+    httpsAgent: new https.Agent({ ca, rejectUnauthorized: Boolean(ca) }),
+    timeout: Number(process.env.K8S_TIMEOUT_MS || 5000),
+  });
+};
+
+const kubernetesRequest = async (operation) => {
+  try {
+    return await operation(getClient());
+  } catch (err) {
+    if (err.statusCode) throw err;
+    if (err.response?.status === 404) {
+      const error = new Error('Kubernetes resource was not found.');
+      error.code = 'KUBERNETES_RESOURCE_NOT_FOUND';
+      error.statusCode = 404;
+      throw error;
+    }
+    throw infrastructureError('Kubernetes API request failed.', err);
+  }
+};
+
 const getAge = (timestamp) => {
-  if (!timestamp) return '1m';
-  const diffSec = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
+  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000));
   if (diffSec < 60) return `${diffSec}s`;
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m`;
   return `${Math.floor(diffSec / 3600)}h`;
 };
 
-const getPods = async ({ deploymentName = 'demo-checkout-service', namespace = 'devops-copilot' }) => {
-  try {
-    const res = await k8sClient.get(`/api/v1/namespaces/${namespace}/pods`, {
-      params: { labelSelector: `app=${deploymentName}` },
-    });
-    if (res.data && res.data.items && res.data.items.length > 0) {
-      return res.data.items.map((pod) => {
-        const containerStatus = pod.status.containerStatuses?.[0] || {};
-        const isReady = containerStatus.ready ? '1/1' : '0/1';
-        let status = pod.status.phase || 'Running';
-        if (containerStatus.state?.waiting?.reason) {
-          status = containerStatus.state.waiting.reason;
-        } else if (containerStatus.state?.terminated?.reason) {
-          status = containerStatus.state.terminated.reason;
-        }
-        return {
-          name: pod.metadata.name,
-          namespace: pod.metadata.namespace,
-          deploymentName,
-          status,
-          ready: isReady,
-          restarts: containerStatus.restartCount || 0,
-          age: getAge(pod.metadata.creationTimestamp),
-          cpu: `${Math.floor(20 + Math.random() * 20)}m`,
-          memory: `${Math.floor(110 + Math.random() * 30)}Mi`,
-          node: pod.spec.nodeName || 'desktop-control-plane',
-        };
-      });
-    }
-  } catch (err) {
-    console.warn(`[k8s.service] K8s API getPods notice: ${err.message}. Using cluster cache.`);
-  }
-
-  // Fallback cache
-  const key = `${namespace}/${deploymentName}`;
-  if (!podRegistry.has(key)) {
-    const defaultPods = [
-      {
-        name: `${deploymentName}-6bd6984b5-56p94`,
-        namespace,
-        deploymentName,
-        status: 'Running',
-        ready: '1/1',
-        restarts: 0,
-        age: '2m',
-        cpu: '24m',
-        memory: '128Mi',
-        node: 'desktop-control-plane',
-      },
-      {
-        name: `${deploymentName}-6bd6984b5-h9j7t`,
-        namespace,
-        deploymentName,
-        status: 'Running',
-        ready: '1/1',
-        restarts: 0,
-        age: '2m',
-        cpu: '28m',
-        memory: '132Mi',
-        node: 'desktop-control-plane',
-      },
-    ];
-    podRegistry.set(key, defaultPods);
-  }
-  return podRegistry.get(key);
-};
-
-const getDeploymentStatus = async ({ deploymentName = 'demo-checkout-service', namespace = 'devops-copilot' }) => {
-  let replicas = 2;
-  let availableReplicas = 2;
-  let isHealthy = true;
-
-  try {
-    const depRes = await k8sClient.get(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`);
-    if (depRes.data) {
-      replicas = depRes.data.spec?.replicas || 2;
-      availableReplicas = depRes.data.status?.availableReplicas || 0;
-      isHealthy = availableReplicas >= replicas && availableReplicas > 0;
-    }
-  } catch (err) {
-    console.warn(`[k8s.service] getDeploymentStatus notice: ${err.message}`);
-  }
-
-  const pods = await getPods({ deploymentName, namespace });
-  const running = pods.filter((p) => p.status === 'Running' && p.ready === '1/1').length;
-  if (running < replicas) {
-    isHealthy = false;
-  }
-
+const parsePod = (pod) => {
+  const statuses = pod.status?.containerStatuses || [];
+  const initStatuses = pod.status?.initContainerStatuses || [];
+  const containers = statuses.map((container) => {
+    const state = container.state || {};
+    const currentState = state.waiting?.reason || state.terminated?.reason || (state.running ? 'Running' : 'Unknown');
+    return {
+      name: container.name,
+      ready: Boolean(container.ready),
+      restartCount: container.restartCount || 0,
+      state: currentState,
+      reason: state.waiting?.reason || state.terminated?.reason || null,
+      message: state.waiting?.message || state.terminated?.message || null,
+      exitCode: state.terminated?.exitCode ?? null,
+    };
+  });
+  const readyCount = containers.filter((container) => container.ready).length;
+  const allReady = containers.length > 0 && readyCount === containers.length;
+  const primaryProblem = containers.find((container) => container.reason);
   return {
-    deploymentName,
-    namespace,
-    replicas,
-    availableReplicas: running,
-    status: isHealthy ? 'Healthy' : 'Degraded',
-    pods,
+    name: pod.metadata.name,
+    namespace: pod.metadata.namespace,
+    phase: pod.status?.phase || 'Unknown',
+    ready: allReady,
+    readiness: `${readyCount}/${containers.length}`,
+    restartCount: containers.reduce((total, container) => total + container.restartCount, 0),
+    status: primaryProblem?.reason || pod.status?.phase || 'Unknown',
+    reason: primaryProblem?.reason || pod.status?.reason || null,
+    message: primaryProblem?.message || pod.status?.message || null,
+    node: pod.spec?.nodeName || null,
+    podIP: pod.status?.podIP || null,
+    createdAt: pod.metadata.creationTimestamp || null,
+    age: pod.metadata?.creationTimestamp ? getAge(pod.metadata.creationTimestamp) : null,
+    containers,
+    initContainers: initStatuses.map((container) => ({ name: container.name, ready: Boolean(container.ready), restartCount: container.restartCount || 0 })),
   };
 };
 
-const restartDeployment = async ({ deploymentName = 'demo-checkout-service', namespace = 'devops-copilot' }) => {
-  try {
-    await k8sClient.patch(
-      `/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`,
-      {
-        spec: {
-          template: {
-            metadata: {
-              annotations: {
-                'kubectl.kubernetes.io/restartedAt': new Date().toISOString(),
-              },
-            },
-            spec: {
-              containers: [
-                {
-                  name: 'checkout-api',
-                  image: 'tharungowda/demo-checkout-service:v1.0.0',
-                  imagePullPolicy: 'IfNotPresent',
-                  command: null,
-                  env: null,
-                },
-              ],
-            },
-          },
-        },
-      },
-      { headers: { 'Content-Type': 'application/merge-patch+json' } }
-    );
-    console.log(`[k8s.service] Rolling restart triggered in live Kubernetes for ${deploymentName}`);
-  } catch (err) {
-    console.warn(`[k8s.service] Live restart notice: ${err.message}`);
+const parseDeployment = (deployment) => {
+  const specReplicas = deployment.spec?.replicas ?? 0;
+  const status = deployment.status || {};
+  const observedGeneration = status.observedGeneration ?? 0;
+  const generation = deployment.metadata?.generation ?? 0;
+  const availableReplicas = status.availableReplicas ?? 0;
+  const readyReplicas = status.readyReplicas ?? 0;
+  return {
+    name: deployment.metadata.name,
+    namespace: deployment.metadata.namespace,
+    generation,
+    observedGeneration,
+    desiredReplicas: specReplicas,
+    availableReplicas,
+    readyReplicas,
+    updatedReplicas: status.updatedReplicas ?? 0,
+    unavailableReplicas: status.unavailableReplicas ?? 0,
+    status: observedGeneration >= generation && specReplicas > 0 && availableReplicas >= specReplicas ? 'Healthy' : 'Degraded',
+    conditions: (status.conditions || []).map((condition) => ({ type: condition.type, status: condition.status, reason: condition.reason || null, message: condition.message || null, lastTransitionTime: condition.lastTransitionTime || null })),
+  };
+};
+
+const parseReplicaSet = (replicaSet) => ({
+  name: replicaSet.metadata.name,
+  namespace: replicaSet.metadata.namespace,
+  revision: replicaSet.metadata.annotations?.['deployment.kubernetes.io/revision'] || null,
+  desiredReplicas: replicaSet.spec?.replicas ?? 0,
+  readyReplicas: replicaSet.status?.readyReplicas ?? 0,
+  availableReplicas: replicaSet.status?.availableReplicas ?? 0,
+  createdAt: replicaSet.metadata.creationTimestamp || null,
+});
+
+const parseEvent = (event) => ({
+  type: event.type || 'Normal',
+  reason: event.reason || null,
+  message: event.message || null,
+  count: event.count ?? 1,
+  firstTimestamp: event.firstTimestamp || event.eventTime || event.metadata?.creationTimestamp || null,
+  lastTimestamp: event.lastTimestamp || event.eventTime || event.metadata?.creationTimestamp || null,
+  involvedObject: { kind: event.involvedObject?.kind || null, name: event.involvedObject?.name || null, namespace: event.involvedObject?.namespace || null },
+});
+
+const listPods = async ({ deploymentName, namespace }) => kubernetesRequest(async (client) => {
+  const response = await client.get(`/api/v1/namespaces/${namespace}/pods`, { params: { labelSelector: `app=${deploymentName}` } });
+  return response.data.items || [];
+});
+
+const getPods = async ({ deploymentName, namespace }) => (await listPods({ deploymentName, namespace })).map(parsePod);
+
+const getDeploymentStatus = async ({ deploymentName, namespace }) => kubernetesRequest(async (client) => {
+  const response = await client.get(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`);
+  return { ...parseDeployment(response.data), pods: await getPods({ deploymentName, namespace }) };
+});
+
+const getReplicaSets = async ({ deploymentName, namespace }) => kubernetesRequest(async (client) => {
+  const response = await client.get(`/apis/apps/v1/namespaces/${namespace}/replicasets`, { params: { labelSelector: `app=${deploymentName}` } });
+  return (response.data.items || [])
+    .filter((item) => (item.metadata.ownerReferences || []).some((owner) => owner.kind === 'Deployment' && owner.name === deploymentName))
+    .map(parseReplicaSet)
+    .sort((left, right) => Number(right.revision || 0) - Number(left.revision || 0));
+});
+
+const getDeploymentHistory = async ({ deploymentName, namespace }) => ({ deploymentName, namespace, replicaSets: await getReplicaSets({ deploymentName, namespace }) });
+
+const getEvents = async ({ deploymentName, namespace }) => kubernetesRequest(async (client) => {
+  const pods = await listPods({ deploymentName, namespace });
+  const relevantNames = new Set([deploymentName, ...pods.map((pod) => pod.metadata.name)]);
+  const response = await client.get(`/api/v1/namespaces/${namespace}/events`);
+  return (response.data.items || [])
+    .filter((event) => relevantNames.has(event.involvedObject?.name))
+    .map(parseEvent)
+    .sort((left, right) => new Date(right.lastTimestamp || 0) - new Date(left.lastTimestamp || 0));
+});
+
+const getPodLogs = async ({ namespace, podName, container, tailLines = Number(process.env.K8S_LOG_TAIL_LINES || 200) }) => {
+  if (!podName) {
+    const error = new Error('A pod name is required to retrieve Kubernetes logs.');
+    error.code = 'LOGS_UNAVAILABLE';
+    error.statusCode = 400;
+    throw error;
   }
-
-  const pods = await getPods({ deploymentName, namespace });
-  return { status: 'restarted', deploymentName, namespace, pods };
+  return kubernetesRequest(async (client) => {
+    const response = await client.get(`/api/v1/namespaces/${namespace}/pods/${podName}/log`, { params: { container: container || undefined, tailLines, timestamps: true } });
+    return { podName, namespace, container: container || null, logs: response.data, tailLines };
+  });
 };
 
-const rollbackDeployment = async ({ deploymentName = 'demo-checkout-service', namespace = 'devops-copilot' }) => {
+const observe = async (operation, unavailableCode) => {
   try {
-    await k8sClient.patch(
-      `/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`,
-      {
-        spec: {
-          template: {
-            metadata: {
-              annotations: {
-                'kubectl.kubernetes.io/restartedAt': new Date().toISOString(),
-                'copilot.recovery/action': 'rollback-to-stable',
-              },
-            },
-            spec: {
-              containers: [
-                {
-                  name: 'checkout-api',
-                  image: 'tharungowda/demo-checkout-service:v1.0.0',
-                  imagePullPolicy: 'IfNotPresent',
-                  command: null,
-                  env: null,
-                },
-              ],
-            },
-          },
-        },
-      },
-      { headers: { 'Content-Type': 'application/merge-patch+json' } }
-    );
-    console.log(`[k8s.service] Rollback executed in live Kubernetes for ${deploymentName}`);
-  } catch (err) {
-    console.warn(`[k8s.service] Live rollback notice: ${err.message}`);
+    return { available: true, source: 'kubernetes', timestamp: new Date().toISOString(), ...(await operation()) };
+  } catch (error) {
+    const transportUnavailable = error.code === 'KUBERNETES_UNAVAILABLE';
+    return {
+      available: false,
+      source: 'kubernetes',
+      timestamp: new Date().toISOString(),
+      errorCode: transportUnavailable ? 'KUBERNETES_UNAVAILABLE' : (error.code || unavailableCode || 'KUBERNETES_UNAVAILABLE'),
+      message: transportUnavailable ? 'Kubernetes API is unavailable.' : error.message,
+    };
   }
-
-  const pods = await getPods({ deploymentName, namespace });
-  return { status: 'rolled_back', deploymentName, namespace, pods };
 };
 
-const scaleDeployment = async ({ deploymentName = 'demo-checkout-service', namespace = 'devops-copilot', replicas = 3 }) => {
-  try {
-    await k8sClient.patch(
-      `/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}/scale`,
-      {
-        spec: { replicas },
-      },
-      { headers: { 'Content-Type': 'application/merge-patch+json' } }
-    );
-    console.log(`[k8s.service] Scaled ${deploymentName} to ${replicas} replicas in live Kubernetes`);
-  } catch (err) {
-    console.warn(`[k8s.service] Live scale notice: ${err.message}`);
-  }
+const restartDeployment = async ({ deploymentName, namespace }) => kubernetesRequest(async (client) => {
+  await client.patch(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`, { spec: { template: { metadata: { annotations: { 'kubectl.kubernetes.io/restartedAt': new Date().toISOString() } } } } }, { headers: { 'Content-Type': 'application/merge-patch+json' } });
+  return { status: 'restart_requested', deploymentName, namespace };
+});
 
-  const pods = await getPods({ deploymentName, namespace });
-  return { status: 'scaled', deploymentName, namespace, replicas, pods };
+const rollbackDeployment = async () => {
+  const error = new Error('Revision-aware Kubernetes rollback is not implemented yet.');
+  error.code = 'KUBERNETES_ROLLBACK_UNAVAILABLE';
+  error.statusCode = 501;
+  throw error;
 };
 
-const injectPodFailure = async ({ deploymentName = 'demo-checkout-service', namespace = 'devops-copilot' }) => {
-  try {
-    await k8sClient.patch(
-      `/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`,
-      {
-        spec: {
-          template: {
-            spec: {
-              containers: [
-                {
-                  name: 'checkout-api',
-                  image: 'tharungowda/demo-checkout-service:v1.0.0',
-                  imagePullPolicy: 'IfNotPresent',
-                  command: ['sh', '-c', "echo '[FATAL] Missing DB credentials! Application crashing...' && exit 1"],
-                },
-              ],
-            },
-          },
-        },
-      },
-      { headers: { 'Content-Type': 'application/merge-patch+json' } }
-    );
-    console.log(`[k8s.service] Injected real CrashLoopBackOff chaos fault into Kubernetes deployment ${deploymentName}`);
-  } catch (err) {
-    console.warn(`[k8s.service] Live fault injection notice: ${err.message}`);
-  }
+const scaleDeployment = async ({ deploymentName, namespace, replicas }) => kubernetesRequest(async (client) => {
+  await client.patch(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}/scale`, { spec: { replicas } }, { headers: { 'Content-Type': 'application/merge-patch+json' } });
+  return { status: 'scale_requested', deploymentName, namespace, replicas };
+});
 
-  const pods = await getPods({ deploymentName, namespace });
-  return pods;
-};
-
-const deployService = async ({ deploymentName = 'demo-checkout-service', namespace = 'devops-copilot', imageName = 'tharungowda/demo-checkout-service:v1.0.0' }) => {
-  return rollbackDeployment({ deploymentName, namespace });
-};
-
-module.exports = {
-  deployService,
-  restartDeployment,
-  rollbackDeployment,
-  scaleDeployment,
-  getDeploymentStatus,
-  getPods,
-  injectPodFailure,
-};
+module.exports = { getPods, getDeploymentStatus, getReplicaSets, getDeploymentHistory, getEvents, getPodLogs, observe, restartDeployment, rollbackDeployment, scaleDeployment, infrastructureError, parsePod, parseDeployment, parseReplicaSet, parseEvent };

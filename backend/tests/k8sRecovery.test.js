@@ -1,37 +1,18 @@
 const assert = require('assert');
-const recoveryService = require('../services/recovery.service');
+const k8s = require('../services/k8s.service');
 
-async function testRecoveryExecution() {
-  console.log('Running Self-Healing Execution & Closed-Loop Verification Tests...\n');
-
-  // Test 1: Rolling Restart Execution & Verification
-  const restartResult = await recoveryService.executeRecovery({
-    deploymentName: 'demo-checkout-service',
-    namespace: 'default',
-    actionType: 'RESTART',
-    reason: 'Automated test restart',
-    bypassCooldown: true,
-  });
-
-  assert.strictEqual(restartResult.success, true);
-  assert.strictEqual(restartResult.status, 'RECOVERY_SUCCESSFUL');
-  assert(restartResult.mttr > 0, 'MTTR must be computed');
-  console.log(`✓ Test 1: RESTART executed and verified in ${restartResult.mttr}s.`);
-
-  // Test 2: Rollback Execution & Verification
-  const rollbackResult = await recoveryService.executeRecovery({
-    deploymentName: 'demo-checkout-service',
-    namespace: 'default',
-    actionType: 'ROLLBACK',
-    reason: 'Automated test rollback',
-    bypassCooldown: true,
-  });
-
-  assert.strictEqual(rollbackResult.success, true);
-  assert.strictEqual(rollbackResult.status, 'RECOVERY_SUCCESSFUL');
-  console.log(`✓ Test 2: ROLLBACK executed and verified in ${rollbackResult.mttr}s.`);
-
-  console.log('\nAll Self-Healing & Verification Tests Passed! (2/2)\n');
+async function run() {
+  const previousUrl = process.env.K8S_API_URL;
+  const previousToken = process.env.K8S_TOKEN;
+  delete process.env.K8S_API_URL;
+  delete process.env.K8S_TOKEN;
+  try {
+    await assert.rejects(() => k8s.getDeploymentStatus({ deploymentName: 'demo-checkout-service', namespace: 'default' }), (error) => error.code === 'KUBERNETES_UNAVAILABLE' && error.statusCode === 503);
+    console.log('Kubernetes unavailable returns KUBERNETES_UNAVAILABLE without healthy defaults.');
+  } finally {
+    if (previousUrl === undefined) delete process.env.K8S_API_URL; else process.env.K8S_API_URL = previousUrl;
+    if (previousToken === undefined) delete process.env.K8S_TOKEN; else process.env.K8S_TOKEN = previousToken;
+  }
 }
 
-testRecoveryExecution().catch(console.error);
+run().catch((error) => { console.error(error); process.exit(1); });

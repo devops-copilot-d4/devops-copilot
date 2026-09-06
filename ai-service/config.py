@@ -12,24 +12,6 @@ class Settings:
     
     @property
     def MODEL_PATH(self) -> str:
-        if os.getenv("MODEL_PATH"):
-            return os.getenv("MODEL_PATH")
-        
-        # Priority 1: Local ml folder inside ai-service (ai-service/ml/model.joblib or /app/ml/model.joblib)
-        local_path = os.path.join(os.path.dirname(__file__), "ml", "model.joblib")
-        if os.path.exists(local_path):
-            return local_path
-            
-        # Priority 2: Root ml folder (../ml/model.joblib)
-        root_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ml", "model.joblib")
-        if os.path.exists(root_path):
-            return root_path
-            
-        # Priority 3: Docker container standard path
-        container_path = "/app/ml/model.joblib"
-        if os.path.exists(container_path):
-            return container_path
-            
-        return local_path
+        return os.getenv("MODEL_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "ml", "model.joblib"))
     
 settings = Settings()

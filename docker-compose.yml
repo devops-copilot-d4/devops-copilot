@@ -13,8 +13,8 @@ services:
   # 2. FastAPI AI Service (ML + LLM Agent)
   ai-service:
     build:
-      context: ./ai-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./ai-service/Dockerfile
     container_name: devops-copilot-ai
     ports:
       - "8000:8000"
@@ -24,7 +24,8 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
     volumes:
       - ./ai-service:/app
-      - ./ml:/app/ml
+      - ./ml:/ml:ro
+      - MODEL_PATH=/ml/model.joblib
     networks:
       - copilot-net
 
@@ -43,7 +44,7 @@ services:
       - PORT=5000
       - MONGO_URI=mongodb://mongodb:27017/devops-copilot
       - AI_SERVICE_URL=http://ai-service:8000
-      - JWT_SECRET=copilot-jwt-super-secret-key-2026
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
       - CLIENT_URL=http://localhost:5173
     depends_on:
       - mongodb
