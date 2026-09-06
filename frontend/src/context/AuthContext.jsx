@@ -11,11 +11,11 @@ const DEFAULT_DEMO_USER = {
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(
-    () => localStorage.getItem('token') || 'demo-operator-token-2026'
+    () => localStorage.getItem('token') || null
   );
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : DEFAULT_DEMO_USER;
+    return stored ? JSON.parse(stored) : null;
   });
 
   useEffect(() => {
