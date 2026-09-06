@@ -4,7 +4,10 @@ const User = require('../models/User');
 const k8sService = require('../services/k8s.service');
 const { emitEvent } = require('../services/socket.service');
 const { parseRepoUrl, triggerWorkflowDispatch, getLatestWorkflowRuns } = require('../services/github.service');
+const { shortSha, imageRef, deploymentTargetFor, evaluateRolloutStatus } = require('../services/ciCd.utils');
 
+// Workflow success no longer fabricates a deployment state. It marks the
+// deployment as 'deploying' so the real Kubernetes rollout can be verified.
 const workflowState = (run) => {
   if (!run || run.status !== 'completed') return { buildStatus: 'building', deployStatus: 'pending' };
   return run.conclusion === 'success'
@@ -31,7 +34,22 @@ const pollWorkflowStatus = async (deploymentId, accessToken, owner, repo, trigge
         if (deployment) {
           const state = workflowState(run);
           await updateDeployment(deployment, state);
-          if (run.status === 'completed') clearInterval(interval);
+          if (run.status === 'completed') {
+            clearInterval(interval);
+            if (run.conclusion === 'success' && deployment.service) {
+              try {
+                const target = deploymentTargetFor(deployment.service);
+                const liveStatus = await k8sService.getDeploymentStatus(target);
+                const evaluation = evaluateRolloutStatus({ deploymentStatus: liveStatus });
+                await updateDeployment(deployment, {
+                  buildStatus: 'success',
+                  deployStatus: evaluation.complete ? 'running' : 'failed',
+                });
+              } catch (k8sErr) {
+                await updateDeployment(deployment, { buildStatus: 'success', deployStatus: 'failed' });
+              }
+            }
+          }
         }
       }
     } catch (err) {
@@ -72,7 +90,59 @@ const triggerDeployment = async (req, res, next) => {
       return res.status(201).json(deployment);
     } catch (err) {
       await updateDeployment(deployment, { buildStatus: 'failed', deployStatus: 'failed' });
-      return res.status(502).json({ message: `GitHub workflow dispatch failed: ${err.message}`, code: 'WORKFLOW_DISPATCH_FAILED', deployment });
+      return res.status(502).json({ message: 'GitHub workflow dispatch failed: ' + err.message, code: 'WORKFLOW_DISPATCH_FAILED', deployment });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Direct Kubernetes deployment: builds an immutable commit-SHA image tag and
+// triggers a real rollout via the Kubernetes API. Never fabricates success.
+const deployToKubernetes = async (req, res, next) => {
+  try {
+    const { serviceId, commitSha } = req.body;
+    const service = await Service.findById(serviceId);
+    if (!service) return res.status(404).json({ message: 'Service not found' });
+
+    const target = deploymentTargetFor(service);
+    const tag = shortSha(commitSha || process.env.CI_COMMIT_SHA || 'HEAD');
+    const registry = 'docker.io';
+    const repository = process.env.DOCKERHUB_USERNAME || process.env.IMAGE_REPOSITORY || 'tharungowda';
+    const image = imageRef({ registry, repository, service: service.imageName || service.deploymentName, tag });
+
+    const deployment = await Deployment.create({
+      service: serviceId,
+      triggeredBy: req.user.id,
+      commitSha: commitSha || null,
+      buildStatus: 'success',
+      deployStatus: 'deploying',
+    });
+    emitEvent('deployment:update', { deploymentId: deployment._id, buildStatus: 'success', deployStatus: 'deploying', deployment });
+
+    const containerName = service.containerName ||
+      target.containerName ||
+      process.env.K8S_CONTAINER_NAME ||
+      'checkout-api';
+
+    try {
+      const result = await k8sService.deployService({
+        deploymentName: target.deploymentName,
+        namespace: target.namespace,
+        containerName,
+        image,
+      });
+      deployment.deployStatus = 'running';
+      deployment.logs = JSON.stringify({ image, rollout: result.evaluation });
+      await deployment.save();
+      emitEvent('deployment:update', { deploymentId: deployment._id, buildStatus: 'success', deployStatus: 'running', deployment });
+      return res.status(201).json({ deployment, image, rollout: result });
+    } catch (k8sErr) {
+      deployment.deployStatus = 'failed';
+      deployment.logs = k8sErr.message;
+      await deployment.save();
+      emitEvent('deployment:update', { deploymentId: deployment._id, buildStatus: 'success', deployStatus: 'failed', deployment });
+      return res.status(k8sErr.statusCode || 502).json({ message: k8sErr.message, code: k8sErr.code || 'KUBERNETES_DEPLOY_FAILED', deployment });
     }
   } catch (err) {
     next(err);
@@ -92,11 +162,13 @@ const getDeploymentStatus = async (req, res, next) => {
   try {
     const deployment = await Deployment.findById(req.params.id).populate('service');
     if (!deployment) return res.status(404).json({ message: 'Deployment not found' });
-    const liveStatus = await k8sService.getDeploymentStatus({ deploymentName: deployment.service.deploymentName, namespace: deployment.service.namespace });
-    res.json({ deployment, liveStatus });
+    const target = deploymentTargetFor(deployment.service);
+    const liveStatus = await k8sService.getDeploymentStatus(target);
+    const evaluation = evaluateRolloutStatus({ deploymentStatus: liveStatus });
+    res.json({ deployment, liveStatus, rollout: evaluation });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { triggerDeployment, getDeployments, getDeploymentStatus, workflowState };
+module.exports = { triggerDeployment, deployToKubernetes, getDeployments, getDeploymentStatus, workflowState };

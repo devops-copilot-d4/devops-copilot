@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 const serviceSchema = new mongoose.Schema(
   {
@@ -7,6 +7,7 @@ const serviceSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     namespace: { type: String, default: 'default' }, // K8s namespace
     deploymentName: { type: String }, // K8s deployment name
+    containerName: { type: String }, // K8s container name
     imageName: { type: String }, // Docker image built for this service
     status: {
       type: String,

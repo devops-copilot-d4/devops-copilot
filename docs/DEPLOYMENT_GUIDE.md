@@ -4,6 +4,8 @@
 **Institution:** The National Institute of Engineering, Department of Computer Science & Engineering  
 **Guide:** Mrs. Sneha S, Assistant Professor  
 
+> For detailed Phase 5 CI/CD & Kubernetes Pipeline documentation, secrets configuration, and rollout tracking architecture, see [PHASE5_CICD_KUBERNETES.md](./PHASE5_CICD_KUBERNETES.md).
+
 ---
 
 ## 1. Local Multi-Container Deployment (Docker Compose)

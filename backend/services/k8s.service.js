@@ -213,4 +213,78 @@ const scaleDeployment = async ({ deploymentName, namespace, replicas }) => kuber
   return { status: 'scale_requested', deploymentName, namespace, replicas };
 });
 
-module.exports = { getPods, getDeploymentStatus, getReplicaSets, getDeploymentHistory, getEvents, getPodLogs, observe, restartDeployment, rollbackDeployment, scaleDeployment, infrastructureError, parsePod, parseDeployment, parseReplicaSet, parseEvent };
+const { evaluateRolloutStatus } = require('./ciCd.utils');
+
+// Kubernetes-native image update (API equivalent of kubectl set image).
+async function setDeploymentImage({ deploymentName, namespace, containerName, image }) {
+  if (!deploymentName || !namespace || !containerName || !image) {
+    const error = new Error('deploymentName, namespace, containerName and image are required to set a deployment image.');
+    error.code = 'INVALID_DEPLOYMENT_IMAGE_REQUEST';
+    error.statusCode = 400;
+    throw error;
+  }
+  return kubernetesRequest(async (client) => {
+    const patch = { spec: { template: { spec: { containers: [{ name: containerName, image }] } } } };
+    const response = await client.patch(
+      '/apis/apps/v1/namespaces/' + namespace + '/deployments/' + deploymentName,
+      patch,
+      { headers: { 'Content-Type': 'application/strategic-merge-patch+json' } }
+    );
+    return {
+      status: 'image_updated',
+      deploymentName, namespace, container: containerName, image,
+      generation: response.data?.metadata?.generation ?? null,
+    };
+  });
+}
+
+// Real rollout tracking: polls Kubernetes until observedGeneration,
+// desired/updated/available/ready replica counts satisfy the contract.
+async function waitForRollout({ deploymentName, namespace, timeoutMs = Number(process.env.K8S_ROLLOUT_TIMEOUT_MS || 180000), intervalMs = Number(process.env.K8S_ROLLOUT_POLL_MS || 5000) }) {
+  const deadline = Date.now() + timeoutMs;
+  let lastStatus = null;
+  while (Date.now() < deadline) {
+    const deployment = await getDeploymentStatus({ deploymentName, namespace });
+    lastStatus = deployment;
+    const evaluation = evaluateRolloutStatus({ deploymentStatus: deployment });
+    if (evaluation.failed) {
+      const error = new Error('Rollout failed: ' + evaluation.reason + ' - ' + evaluation.message);
+      error.code = 'KUBERNETES_ROLLOUT_FAILED';
+      error.statusCode = 502;
+      error.details = evaluation;
+      throw error;
+    }
+    if (evaluation.complete) {
+      return {
+        status: 'rollout_complete',
+        deploymentName, namespace, evaluation, deployment: lastStatus,
+        durationMs: timeoutMs - (deadline - Date.now()),
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  const error = new Error(
+    'Rollout timed out after ' + Math.floor(timeoutMs / 1000) + 's. ' +
+    'Latest status: ' + (lastStatus ? lastStatus.availableReplicas + '/' + lastStatus.desiredReplicas + ' available, ' + lastStatus.updatedReplicas + '/' + lastStatus.desiredReplicas + ' updated' : 'unknown') + '.'
+  );
+  error.code = 'KUBERNETES_ROLLOUT_TIMEOUT';
+  error.statusCode = 504;
+  error.details = lastStatus;
+  throw error;
+}
+
+// Deploys by setting the container image and waiting for a real rollout.
+async function deployService({ deploymentName, namespace, containerName, image }) {
+  if (!image) {
+    const error = new Error('image is required to deploy a service.');
+    error.code = 'INVALID_DEPLOYMENT_IMAGE_REQUEST';
+    error.statusCode = 400;
+    throw error;
+  }
+  const resolvedContainer = containerName || (deploymentName === 'demo-checkout-service' ? 'checkout-api' : (process.env.K8S_CONTAINER_NAME || 'checkout-api'));
+  const imageResult = await setDeploymentImage({ deploymentName, namespace, containerName: resolvedContainer, image });
+  const rollout = await waitForRollout({ deploymentName, namespace });
+  return { ...imageResult, ...rollout, status: 'deployed' };
+}
+
+module.exports = { getPods, getDeploymentStatus, getReplicaSets, getDeploymentHistory, getEvents, getPodLogs, observe, restartDeployment, rollbackDeployment, scaleDeployment, setDeploymentImage, waitForRollout, deployService, kubernetesRequest, infrastructureError, parsePod, parseDeployment, parseReplicaSet, parseEvent };
