@@ -21,9 +21,12 @@ async def call_llm(prompt: str) -> Optional[str]:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "temperature": 0.1,
-                "maxOutputTokens": 600
-            }
+    "temperature": 0.1,
+    "maxOutputTokens": 1000,
+    "thinkingConfig": {
+        "thinkingBudget": 0
+    }
+}
         }
         async with httpx.AsyncClient(timeout=8.0) as client:
             try:

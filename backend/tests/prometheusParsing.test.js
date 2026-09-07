@@ -14,7 +14,23 @@ async function run() {
     await assert.rejects(() => queryInstant('up'), (error) => error.code === 'PROMETHEUS_NO_DATA' && error.statusCode === 503);
     const telemetry = await collectServiceTelemetry({ name: 'checkout', deploymentName: 'demo-checkout-service', namespace: 'devops-copilot' });
     assert.strictEqual(telemetry.available, true, 'Prometheus responded, but the requested metrics are unavailable.');
-    assert(telemetry.metrics.every((item) => item.available === false && item.errorCode === 'METRIC_UNAVAILABLE'));
+    const errorRate = telemetry.metrics.find(
+  (item) => item.name === 'error_rate_per_second'
+);
+
+assert(errorRate);
+assert.strictEqual(errorRate.available, true);
+assert.strictEqual(errorRate.value, 0);
+
+const unavailableMetrics = telemetry.metrics.filter(
+  (item) => item.name !== 'error_rate_per_second'
+);
+
+assert(
+  unavailableMetrics.every(
+    (item) => item.available === false && item.errorCode === 'METRIC_UNAVAILABLE'
+  )
+);
     console.log('Prometheus response parsing and missing-metric handling passed.');
   } finally {
     axios.get = originalGet;

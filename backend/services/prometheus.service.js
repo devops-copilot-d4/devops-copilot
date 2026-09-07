@@ -86,19 +86,63 @@ const buildMetricDefinitions = (service) => {
 
 const collectMetric = async (definition, service) => {
   try {
-    const parsed = parsePrometheusMetric(await queryInstant(definition.query));
-    if (!parsed) return { name: definition.name, query: definition.query, source: 'prometheus', available: false, errorCode: 'PROMETHEUS_INVALID_DATA', message: 'Prometheus returned no numeric value.' };
-    return { name: definition.name, query: definition.query, source: 'prometheus', available: true, ...parsed };
+    let result;
+
+    try {
+      result = await queryInstant(definition.query);
+    } catch (error) {
+      // An absent 5xx series means zero observed errors, not missing telemetry.
+      if (definition.name === 'error_rate_per_second' && error.code === 'PROMETHEUS_NO_DATA') {
+        return {
+          name: definition.name,
+          query: definition.query,
+          source: 'prometheus',
+          available: true,
+          timestamp: new Date().toISOString(),
+          value: 0,
+          labels: {},
+        };
+      }
+      throw error;
+    }
+
+    const parsed = parsePrometheusMetric(result);
+
+    if (!parsed) {
+      return {
+        name: definition.name,
+        query: definition.query,
+        source: 'prometheus',
+        available: false,
+        errorCode: 'PROMETHEUS_INVALID_DATA',
+        message: 'Prometheus returned no numeric value.',
+      };
+    }
+
+    return {
+      name: definition.name,
+      query: definition.query,
+      source: 'prometheus',
+      available: true,
+      ...parsed,
+    };
   } catch (error) {
-    const missing = error.code === 'PROMETHEUS_NO_DATA' || error.code === 'PROMETHEUS_INVALID_DATA';
+    const missing =
+      error.code === 'PROMETHEUS_NO_DATA' ||
+      error.code === 'PROMETHEUS_INVALID_DATA';
+
     return {
       name: definition.name,
       query: definition.query,
       source: 'prometheus',
       available: false,
-      errorCode: missing ? 'METRIC_UNAVAILABLE' : (error.code || 'PROMETHEUS_UNAVAILABLE'),
+      errorCode: missing
+        ? 'METRIC_UNAVAILABLE'
+        : (error.code || 'PROMETHEUS_UNAVAILABLE'),
       ...(missing ? { sourceErrorCode: error.code } : {}),
-      message: missing ? 'No usable Prometheus sample is available for this metric.' : 'Prometheus telemetry is unavailable.',
+      message: missing
+        ? 'No usable Prometheus sample is available for this metric.'
+        : 'Prometheus telemetry is unavailable.',
     };
   }
 };
