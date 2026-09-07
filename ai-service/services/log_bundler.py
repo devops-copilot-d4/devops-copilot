@@ -43,19 +43,22 @@ def create_compact_context_bundle(
     telemetry: TelemetryPayload,
     prediction: PredictResponse,
     logs: str = "",
-    recent_deployment_info: str = "v1.0.0"
+    recent_deployment_info: str = "v1.0.0",
+    events: str = "",
+    pod_state: str = ""
 ) -> CompactContextBundle:
     extracted = clean_and_deduplicate_logs(logs)
     
     return CompactContextBundle(
-        pod_status="not provided to the ML predictor",
-        recent_deployment=recent_deployment_info or "latest",
+        pod_status=pod_state or "unavailable",
+        recent_deployment=recent_deployment_info or "unavailable",
         restart_count=telemetry.restart_count,
         extracted_errors=extracted,
-        recent_changes="Configuration and environment updated in latest deployment rollout",
+        recent_changes=None,
         cpu_usage=telemetry.cpu_usage,
         memory_usage=telemetry.memory_usage,
         ml_failure_probability=prediction.failure_probability,
         ml_risk_level=prediction.risk_level,
-        predicted_failure_type=prediction.predicted_failure_type
+        predicted_failure_type=prediction.predicted_failure_type,
+        kubernetes_events=[line.strip() for line in events.splitlines() if line.strip()][:40],
     )

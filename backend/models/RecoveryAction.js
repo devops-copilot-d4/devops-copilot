@@ -19,6 +19,12 @@ const recoveryActionSchema = new mongoose.Schema(
     },
     requirementVerified: { type: Boolean, default: false }, // post-recovery SLO check result
     mttr: { type: Number }, // Mean Time to Recover in seconds
+    target: { type: mongoose.Schema.Types.Mixed },
+    confidence: { type: Number, min: 0, max: 1 },
+    startedAt: { type: Date },
+    completedAt: { type: Date },
+    verificationResult: { type: String },
+    error: { type: String },
   },
   { timestamps: true }
 );

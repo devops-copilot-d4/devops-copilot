@@ -113,6 +113,13 @@ const parseDeployment = (deployment) => {
     unavailableReplicas: status.unavailableReplicas ?? 0,
     status: observedGeneration >= generation && specReplicas > 0 && availableReplicas >= specReplicas ? 'Healthy' : 'Degraded',
     conditions: (status.conditions || []).map((condition) => ({ type: condition.type, status: condition.status, reason: condition.reason || null, message: condition.message || null, lastTransitionTime: condition.lastTransitionTime || null })),
+    resourceLimits: (() => {
+      const limits = deployment.spec?.template?.spec?.containers?.[0]?.resources?.limits || {};
+      const cpu = typeof limits.cpu === 'string' && limits.cpu.endsWith('m') ? Number(limits.cpu.slice(0, -1)) / 1000 : Number(limits.cpu);
+      const memoryMatch = String(limits.memory || '').match(/^(\d+(?:\.\d+)?)(Ki|Mi|Gi)?$/);
+      const memoryBytes = memoryMatch ? Number(memoryMatch[1]) * ({ Ki: 1024, Mi: 1024 ** 2, Gi: 1024 ** 3 }[memoryMatch[2]] || 1) : NaN;
+      return { cpuCores: Number.isFinite(cpu) ? cpu : null, memoryBytes: Number.isFinite(memoryBytes) ? memoryBytes : null };
+    })(),
   };
 };
 
@@ -196,17 +203,35 @@ const observe = async (operation, unavailableCode) => {
   }
 };
 
-const restartDeployment = async ({ deploymentName, namespace }) => kubernetesRequest(async (client) => {
-  await client.patch(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`, { spec: { template: { metadata: { annotations: { 'kubectl.kubernetes.io/restartedAt': new Date().toISOString() } } } } }, { headers: { 'Content-Type': 'application/merge-patch+json' } });
-  return { status: 'restart_requested', deploymentName, namespace };
+const restartPod = async ({ deploymentName, namespace, podName }) => kubernetesRequest(async (client) => {
+  const pods = await listPods({ deploymentName, namespace });
+  const selected = podName ? pods.find((pod) => pod.metadata.name === podName) : pods.find((pod) => !parsePod(pod).ready) || pods[0];
+  if (!selected) {
+    const error = new Error('No deployment pod is available to restart.'); error.code = 'KUBERNETES_RESOURCE_NOT_FOUND'; error.statusCode = 404; throw error;
+  }
+  await client.delete(`/api/v1/namespaces/${namespace}/pods/${selected.metadata.name}`);
+  return { status: 'pod_restart_requested', deploymentName, namespace, podName: selected.metadata.name };
 });
 
-const rollbackDeployment = async () => {
-  const error = new Error('Revision-aware Kubernetes rollback is not implemented yet.');
-  error.code = 'KUBERNETES_ROLLBACK_UNAVAILABLE';
-  error.statusCode = 501;
-  throw error;
-};
+// Compatibility wrapper retained for existing consumers; a pod delete causes
+// the Deployment controller to create a replacement through the Kubernetes API.
+const restartDeployment = restartPod;
+
+const rollbackDeployment = async ({ deploymentName, namespace }) => kubernetesRequest(async (client) => {
+  const current = await client.get(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`);
+  const replicaSets = await client.get(`/apis/apps/v1/namespaces/${namespace}/replicasets`, { params: { labelSelector: `app=${deploymentName}` } });
+  const owned = (replicaSets.data.items || []).filter((rs) => (rs.metadata.ownerReferences || []).some((owner) => owner.kind === 'Deployment' && owner.name === deploymentName));
+  const currentRevision = Number(current.data.metadata.annotations?.['deployment.kubernetes.io/revision'] || 0);
+  const previous = owned.filter((rs) => Number(rs.metadata.annotations?.['deployment.kubernetes.io/revision'] || 0) < currentRevision)
+    .sort((a, b) => Number(b.metadata.annotations?.['deployment.kubernetes.io/revision'] || 0) - Number(a.metadata.annotations?.['deployment.kubernetes.io/revision'] || 0))[0];
+  if (!previous?.spec?.template) {
+    const error = new Error('No previous Deployment revision is available for rollback.'); error.code = 'KUBERNETES_ROLLBACK_UNAVAILABLE'; error.statusCode = 409; throw error;
+  }
+  await client.patch(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}`, { spec: { template: previous.spec.template } }, { headers: { 'Content-Type': 'application/merge-patch+json' } });
+  return { status: 'rollback_requested', deploymentName, namespace, fromRevision: currentRevision, toRevision: Number(previous.metadata.annotations?.['deployment.kubernetes.io/revision']) };
+});
+
+const recreateResource = async ({ deploymentName, namespace }) => restartPod({ deploymentName, namespace });
 
 const scaleDeployment = async ({ deploymentName, namespace, replicas }) => kubernetesRequest(async (client) => {
   await client.patch(`/apis/apps/v1/namespaces/${namespace}/deployments/${deploymentName}/scale`, { spec: { replicas } }, { headers: { 'Content-Type': 'application/merge-patch+json' } });
@@ -287,4 +312,4 @@ async function deployService({ deploymentName, namespace, containerName, image }
   return { ...imageResult, ...rollout, status: 'deployed' };
 }
 
-module.exports = { getPods, getDeploymentStatus, getReplicaSets, getDeploymentHistory, getEvents, getPodLogs, observe, restartDeployment, rollbackDeployment, scaleDeployment, setDeploymentImage, waitForRollout, deployService, kubernetesRequest, infrastructureError, parsePod, parseDeployment, parseReplicaSet, parseEvent };
+module.exports = { getPods, getDeploymentStatus, getReplicaSets, getDeploymentHistory, getEvents, getPodLogs, observe, restartPod, restartDeployment, rollbackDeployment, recreateResource, scaleDeployment, setDeploymentImage, waitForRollout, deployService, kubernetesRequest, infrastructureError, parsePod, parseDeployment, parseReplicaSet, parseEvent };

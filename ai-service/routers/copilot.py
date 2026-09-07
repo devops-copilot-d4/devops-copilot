@@ -23,7 +23,9 @@ async def analyze_copilot_state(request: CopilotAnalysisRequest):
             telemetry=request.telemetry,
             prediction=ml_prediction,
             logs=request.logs or "",
-            recent_deployment_info=request.recent_deployment_info or "v1.0"
+            recent_deployment_info=request.recent_deployment_info or "unavailable",
+            events=request.events or "",
+            pod_state=request.pod_state or "",
         )
         
         # Step 3: LLM Root Cause Diagnosis & Recovery Recommendation

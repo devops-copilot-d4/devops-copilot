@@ -15,6 +15,7 @@ const recoveryRoutes = require('./routes/recovery.routes');
 const serviceRoutes = require('./routes/service.routes');
 const simulationRoutes = require('./routes/simulation.routes');
 const observabilityRoutes = require('./routes/observability.routes');
+const copilotRoutes = require('./routes/copilot.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -56,6 +57,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/recovery', recoveryRoutes);
 app.use('/api/simulation', simulationRoutes);
 app.use('/api/observability', observabilityRoutes);
+app.use('/api/copilot', copilotRoutes);
 
 
 // 404 handler

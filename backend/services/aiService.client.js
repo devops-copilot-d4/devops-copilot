@@ -22,7 +22,7 @@ class AIServiceClient {
     }
   }
 
-  async analyzeCopilotState({ serviceName, namespace = 'default', telemetry, logs = '', events = '', recentDeploymentInfo = 'v1.0' }) {
+  async analyzeCopilotState({ serviceName, namespace = 'default', telemetry, logs = '', events = '', recentDeploymentInfo = 'v1.0', podState = '' }) {
     try {
       const response = await axios.post(`${this.baseUrl}/copilot/analyze`, {
         service_name: serviceName,
@@ -31,10 +31,14 @@ class AIServiceClient {
         logs,
         events,
         recent_deployment_info: recentDeploymentInfo,
+        pod_state: podState,
       }, { timeout: Number(process.env.AI_SERVICE_TIMEOUT_MS || 6000) });
       return response.data;
     } catch (err) {
-      throw aiServiceError(`AI analysis service unavailable: ${err.message}`, err);
+      const detail = err.response?.data?.detail;
+      const error = aiServiceError(`AI analysis service unavailable: ${err.message}`, err);
+      if (detail?.code === 'LLM_UNAVAILABLE') error.code = 'LLM_UNAVAILABLE';
+      throw error;
     }
   }
 }

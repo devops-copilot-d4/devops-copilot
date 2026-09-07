@@ -13,10 +13,7 @@ const AIInsightsPanel = ({ onTriggerRecovery, refreshKey }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await AIInsightsAPI.copilotDiagnose({
-        serviceName: 'demo-checkout-service',
-        namespace: 'default',
-      });
+      const res = await AIInsightsAPI.analyzeCopilot({ serviceName: 'demo-checkout-service' });
       setDiagnosis(res.data);
     } catch (err) {
       console.error('[AIInsightsPanel] Diagnosis fetch error:', err);
@@ -40,15 +37,18 @@ const AIInsightsPanel = ({ onTriggerRecovery, refreshKey }) => {
   }, [fetchDiagnosis, refreshKey]);
 
   // Derived Values from Real Backend Response
-  const isHighRisk = diagnosis?.risk === 'HIGH';
-  const isMediumRisk = diagnosis?.risk === 'MEDIUM';
-  const riskClass = isHighRisk ? 'badge-critical' : isMediumRisk ? 'badge-warning' : 'badge-healthy';
-  const riskColor = isHighRisk ? 'var(--status-critical)' : isMediumRisk ? 'var(--status-warning)' : 'var(--status-healthy)';
-  const probabilityPercent = diagnosis?.probability != null ? Math.round(diagnosis.probability * 100) : (isHighRisk ? 98 : 5);
-  const failureType = diagnosis?.failure_type || (isHighRisk ? 'CrashLoopBackOff' : 'Normal');
-  const likelyCause = diagnosis?.likely_cause || (isHighRisk ? 'Application configuration failure or unhandled startup crash post-deployment.' : 'System operating within standard nominal operational bounds.');
-  const action = diagnosis?.recommended_action || (isHighRisk ? 'ROLLBACK' : 'NO ACTION');
-  const confidencePercent = diagnosis?.confidence != null ? Math.round(diagnosis.confidence * 100) : (isHighRisk ? 91 : 95);
+  const prediction = diagnosis?.prediction;
+  const rca = diagnosis?.rca;
+  const hasPrediction = prediction?.failure_probability != null;
+  const isHighRisk = prediction?.risk_level === 'HIGH';
+  const isMediumRisk = prediction?.risk_level === 'MEDIUM';
+  const riskClass = !hasPrediction ? 'badge-neutral' : isHighRisk ? 'badge-critical' : isMediumRisk ? 'badge-warning' : 'badge-healthy';
+  const riskColor = !hasPrediction ? 'var(--text-muted)' : isHighRisk ? 'var(--status-critical)' : isMediumRisk ? 'var(--status-warning)' : 'var(--status-healthy)';
+  const probabilityPercent = prediction?.failure_probability != null ? Math.round(prediction.failure_probability * 100) : null;
+  const failureType = prediction?.predicted_failure_type || 'Unavailable';
+  const likelyCause = rca?.likely_cause || (diagnosis?.status === 'NO_FAILURE_PREDICTED' ? 'No failure was predicted from the collected telemetry.' : 'Unavailable');
+  const action = rca?.recommended_action || 'Unavailable';
+  const confidencePercent = rca?.confidence != null ? Math.round(rca.confidence * 100) : null;
 
   return (
     <div className="card-panel" style={{ border: isHighRisk ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border)' }}>
@@ -118,10 +118,10 @@ const AIInsightsPanel = ({ onTriggerRecovery, refreshKey }) => {
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <span className="font-mono" style={{ fontSize: '32px', fontWeight: 800, color: riskColor }}>
-                {probabilityPercent}%
+                {probabilityPercent == null ? '—' : `${probabilityPercent}%`}
               </span>
               <span className={`badge-pill ${riskClass}`}>
-                {diagnosis?.risk || (isHighRisk ? 'HIGH' : 'LOW')}
+                {prediction?.risk_level || diagnosis?.status || 'UNAVAILABLE'}
               </span>
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginTop: 2 }}>
@@ -131,7 +131,7 @@ const AIInsightsPanel = ({ onTriggerRecovery, refreshKey }) => {
             {/* Probability Bar */}
             <div style={{ width: '100%', height: 5, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
               <div style={{
-                width: `${Math.min(100, Math.max(5, probabilityPercent))}%`,
+                width: `${probabilityPercent == null ? 0 : Math.min(100, Math.max(5, probabilityPercent))}%`,
                 height: '100%',
                 background: riskColor,
                 transition: 'width 0.3s ease',
@@ -154,11 +154,11 @@ const AIInsightsPanel = ({ onTriggerRecovery, refreshKey }) => {
               <div>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Recommended Action: </span>
                 <span className="badge-pill badge-ai" style={{ fontSize: '12px', padding: '3px 10px' }}>
-                  {isHighRisk ? '↻ ROLLBACK' : action}
+                  {action}
                 </span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono' }}>
-                Confidence: <strong style={{ color: 'var(--text-primary)' }}>{confidencePercent}%</strong>
+                Confidence: <strong style={{ color: 'var(--text-primary)' }}>{confidencePercent == null ? '—' : `${confidencePercent}%`}</strong>
               </div>
             </div>
 
@@ -173,6 +173,11 @@ const AIInsightsPanel = ({ onTriggerRecovery, refreshKey }) => {
         {error && (
           <div style={{ fontSize: '11px', color: 'var(--status-critical)', background: 'var(--status-critical-subtle)', padding: '6px 10px', borderRadius: 4 }}>
             Inference engine notification: {error}
+          </div>
+        )}
+        {diagnosis?.status && (
+          <div style={{ fontSize: '11px', color: diagnosis.status.includes('UNAVAILABLE') ? 'var(--status-warning)' : 'var(--text-secondary)', paddingTop: 8 }}>
+            Control-loop status: {diagnosis.status}{diagnosis?.recovery?.verificationResult ? ` · ${diagnosis.recovery.verificationResult}` : ''}
           </div>
         )}
       </div>

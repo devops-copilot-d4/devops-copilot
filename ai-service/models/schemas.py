@@ -1,7 +1,8 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class TelemetryPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     cpu_usage: float = Field(..., description="CPU utilization percentage (0-100)")
     memory_usage: float = Field(..., description="Memory utilization percentage (0-100)")
     restart_count: int = Field(..., ge=0)
@@ -36,6 +37,7 @@ class CompactContextBundle(BaseModel):
     ml_failure_probability: float
     ml_risk_level: str
     predicted_failure_type: str
+    kubernetes_events: List[str] = Field(default_factory=list)
 
 class CopilotAnalysisRequest(BaseModel):
     service_name: str
@@ -44,6 +46,7 @@ class CopilotAnalysisRequest(BaseModel):
     logs: Optional[str] = ""
     events: Optional[str] = ""
     recent_deployment_info: Optional[str] = "deployment v1"
+    pod_state: Optional[str] = ""
 
 class CopilotDiagnosisResponse(BaseModel):
     risk: str = Field(..., description="Risk level: LOW, MEDIUM, or HIGH")
@@ -52,5 +55,5 @@ class CopilotDiagnosisResponse(BaseModel):
     likely_cause: str = Field(..., description="Root cause summary derived from logs and state")
     recommended_action: str = Field(..., description="Pre-approved action: NO ACTION, RESTART, SCALE, ROLLBACK, RECREATE")
     reason: str = Field(..., description="Justification explaining why this action was chosen")
-    confidence: float = Field(..., description="Confidence score between 0.0 and 1.0")
+    confidence: float = Field(..., ge=0, le=1, description="Confidence score between 0.0 and 1.0")
     context_summary: Optional[Dict[str, Any]] = None

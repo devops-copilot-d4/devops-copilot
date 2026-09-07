@@ -78,6 +78,7 @@ POD STATUS: {bundle.pod_status}
 RECENT DEPLOYMENT: {bundle.recent_deployment}
 RESTART COUNT: {bundle.restart_count}
 EXTRACTED ERRORS: {json.dumps(bundle.extracted_errors)}
+KUBERNETES EVENTS: {json.dumps(bundle.kubernetes_events)}
 RECENT CHANGES: {bundle.recent_changes}
 CPU USAGE: {bundle.cpu_usage}%
 MEMORY USAGE: {bundle.memory_usage}%
@@ -105,19 +106,26 @@ RULES:
     raw_response = await call_llm(prompt)
     parsed = extract_json(raw_response) if raw_response else None
     
-    if parsed and "recommended_action" in parsed:
+    required_fields = {"likely_cause", "recommended_action", "reason", "confidence"}
+    if parsed and required_fields.issubset(parsed):
         action = str(parsed.get("recommended_action", "NO ACTION")).upper()
         if action not in ["NO ACTION", "RESTART", "SCALE", "ROLLBACK", "RECREATE"]:
-            action = "RESTART"
+            raise LLMUnavailableError("LLM analysis returned an action outside the approved recommendation schema.")
+        try:
+            confidence = float(parsed["confidence"])
+        except (TypeError, ValueError) as error:
+            raise LLMUnavailableError("LLM analysis returned an invalid confidence value.") from error
+        if not 0 <= confidence <= 1:
+            raise LLMUnavailableError("LLM analysis returned an out-of-range confidence value.")
             
         return CopilotDiagnosisResponse(
             risk=bundle.ml_risk_level,
             failure_type=bundle.predicted_failure_type,
             probability=bundle.ml_failure_probability,
-            likely_cause=parsed.get("likely_cause", "Anomaly identified in deployment telemetry"),
+            likely_cause=str(parsed["likely_cause"]),
             recommended_action=action,
-            reason=parsed.get("reason", "Action chosen based on operational telemetry pattern"),
-            confidence=float(parsed.get("confidence", 0.88)),
+            reason=str(parsed["reason"]),
+            confidence=confidence,
             context_summary=bundle.model_dump()
         )
         

@@ -22,6 +22,7 @@ def test_valid_prediction_uses_loaded_model():
 def test_schema_rejects_missing_and_invalid_input():
     with pytest.raises(Exception): TelemetryPayload(**{key: value for key, value in PAYLOAD.items() if key != "event_count"})
     with pytest.raises(Exception): TelemetryPayload(**{**PAYLOAD, "recent_deployment": 2})
+    with pytest.raises(Exception): TelemetryPayload(**{**PAYLOAD, "pod_status": "Healthy"})
 
 def test_missing_artifact_is_unavailable(monkeypatch):
     monkeypatch.setenv("MODEL_PATH", "/does/not/exist.joblib")

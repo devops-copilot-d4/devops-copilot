@@ -25,6 +25,7 @@ export const MonitoringAPI = {
 export const AIInsightsAPI = {
   predict: (telemetry) => api.post('/ai/predict', telemetry),
   copilotDiagnose: (data) => api.post('/ai/copilot/diagnose', data),
+  analyzeCopilot: (data) => api.post('/copilot/analyze', data),
   runRCA: (data) => api.post('/ai/rca', data),
   incidents: () => api.get('/ai/incidents'),
 };
