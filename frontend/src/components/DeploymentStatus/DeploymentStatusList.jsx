@@ -53,12 +53,7 @@ const DeploymentStatusList = ({ refreshKey }) => {
           <tbody>
             {deployments.length === 0 ? (
               <tr>
-                <td className="font-mono" style={{ color: 'var(--text-muted)' }}>12:41:14</td>
-                <td><strong className="font-mono" style={{ color: 'var(--text-primary)' }}>demo-checkout-service</strong></td>
-                <td><code className="font-mono">v1.0.0</code></td>
-                <td><span className="badge-pill badge-healthy">RECOVERED</span></td>
-                <td className="font-mono">0.83s</td>
-                <td><span className="font-mono" style={{ color: 'var(--accent-ai)', fontWeight: 600 }}>ROLLBACK</span></td>
+                <td colSpan="6" className="empty-cell">No deployment records are available.</td>
               </tr>
             ) : (
               deployments.slice(0, 6).map((d) => {
@@ -90,12 +85,12 @@ const DeploymentStatusList = ({ refreshKey }) => {
                     </td>
                     <td>
                       <strong className="font-mono" style={{ color: 'var(--text-primary)' }}>
-                        {d.service?.name || 'demo-checkout-service'}
+                        {d.service?.name || 'Unavailable'}
                       </strong>
                     </td>
                     <td>
                       <code className="font-mono" style={{ color: 'var(--status-telemetry)' }}>
-                        {d.commitSha ? d.commitSha.substring(0, 7) : 'v1.0.0'}
+                        {d.commitSha ? d.commitSha.substring(0, 7) : 'Unavailable'}
                       </code>
                     </td>
                     <td>
@@ -104,7 +99,7 @@ const DeploymentStatusList = ({ refreshKey }) => {
                       </span>
                     </td>
                     <td className="font-mono" style={{ color: 'var(--text-secondary)' }}>
-                      {isRunning ? '0.83s' : isDeploying ? '1.24s' : '0.42s'}
+                      {d.durationMs != null ? `${d.durationMs}ms` : 'Unavailable'}
                     </td>
                     <td>
                       <span className="font-mono" style={{ color: 'var(--accent-ai)', fontWeight: 600 }}>

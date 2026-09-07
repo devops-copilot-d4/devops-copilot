@@ -205,9 +205,9 @@ const Sidebar = ({ activeTab, onSelectTab }) => {
           <span>Settings</span>
         </button>
 
-        <div className="system-status-indicator">
+        <div className="system-status-indicator system-status-neutral">
           <span className="status-dot" />
-          <span>System Operational</span>
+          <span>Live status via dashboard</span>
         </div>
       </div>
     </aside>
