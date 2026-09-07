@@ -1,129 +1,112 @@
 # AI DevOps Copilot
 
-> **Official Project Title:** AI DevOps Copilot – AI Agent for Autonomous CI/CD Failure Prediction and Self-Healing  
-> **Institution:** The National Institute of Engineering, Department of Computer Science & Engineering  
-> **Guide:** Mrs. Sneha S, Assistant Professor  
-> **Team (Batch D4):**
-> 1. **4NI23CS230 – Tharun Gowda K** (*Backend, CI/CD, Project Coordination*)
-> 2. **4NI23CS244 – Vikas S** (*Kubernetes, Self-Healing Controller*)
-> 3. **4NI23CS249 – Vishnu M** (*ML Model, AI/LLM Diagnostic Agent*)
-> 4. **4NI23CS253 – Yashwanth P** (*Frontend Dashboard, Monitoring Integration*)
+AI DevOps Copilot is a final-year CSE project that connects CI/CD, Kubernetes observations, Prometheus telemetry, a Random Forest predictor, structured LLM root-cause analysis, deterministic recovery controls, and verification. It is an experimental, controlled-autonomy implementation—not a production operations platform.
 
----
+## What is implemented
 
-## 📌 Project Overview
-**AI DevOps Copilot** is an integrated predictive and diagnostic DevOps control loop that combines **supervised failure prediction (Random Forest)**, **contextual AI-based root cause analysis (LLM RCA)**, **deterministic safety guardrails**, **Kubernetes remediation**, and **post-recovery closed-loop verification**.
+- React/Vite operations dashboard with services, deployments, incidents, copilot analysis, recovery audit history, and explicit unavailable states.
+- Node.js/Express control plane with MongoDB audit records and authenticated APIs.
+- FastAPI AI service using the canonical `ml/model.joblib` Random Forest artifact.
+- Exact eight-feature precursor contract: `cpu_usage`, `memory_usage`, `restart_count`, `error_rate`, `response_time`, `recent_deployment`, `log_error_count`, and `event_count`.
+- Evidence-bound RCA: logs, Kubernetes events, pod/deployment state, and prediction are supplied to the LLM; the LLM cannot execute commands.
+- Typed, allowlisted Kubernetes recovery: restart a Deployment-owned pod, scale a Deployment, revision-aware rollback, or controlled pod recreation.
+- Recovery verification requires rollout/readiness and a post-action Prometheus query. Missing verification produces `RECOVERY_INCONCLUSIVE`.
+- GitHub Actions validation, container builds, and an opt-in, secret-gated Kubernetes deployment job for the existing demo workload.
+- Fail-closed live E2E runner for a separately configured Kubernetes/Prometheus environment.
 
-```
-USER
- ↓
-REACT WEB DASHBOARD (Port 5173)
- ↓
-NODE.JS + EXPRESS CONTROL PLANE (Port 5000)
- ├── MongoDB (Audit & Telemetry)
- ├── GitHub Actions (CI/CD Pipeline)
- ├── Kubernetes API (Workload Orchestration)
- ├── Prometheus (Time-Series Metrics)
- └── FASTAPI AI MICROSERVICE (Port 8000)
-         ├── Random Forest Failure Predictor (POST /predict)
-         └── LLM Contextual RCA & Decision Reasoner (POST /copilot/analyze)
-```
+## Architecture
 
-### The Autonomous Control Loop
-```
-Kubernetes Workload 
-       ↓ Telemetry (CPU, Memory, Restarts, Error Rate, Pod Phase)
-Prometheus & Log Collector
-       ↓ Telemetry + Log Context
-Node.js Control Plane
-       ↓ POST /copilot/analyze
-FastAPI AI Service
-       ├─► Random Forest: Failure Probability & Failure Type (CrashLoopBackOff)
-       └─► LLM Agent: Root Cause & Action Recommendation (ROLLBACK, 91% Confidence)
-Node.js Control Plane
-       ↓
-Deterministic Safety Guard (Allow-list, Namespace, 60s Cooldown, Max 2 Retries)
-       ↓ Approved
-Recovery Service
-       ↓
-Kubernetes API (Rollback / Restart / Scale)
-       ↓
-Closed-Loop Verification (2/2 Pods Ready & SLO Restored)
-       ↓
-MongoDB Audit Persistence & Real-Time Socket.IO Updates
-       ↓
-React Enterprise Dashboard
+```mermaid
+flowchart LR
+  UI[React dashboard] --> API[Express control plane]
+  API --> DB[(MongoDB)]
+  API --> K8S[Kubernetes API]
+  API --> PROM[Prometheus]
+  API --> AI[FastAPI AI service]
+  AI --> MODEL[Canonical Random Forest model]
+  AI --> LLM[Configured LLM API]
+  CI[GitHub Actions] --> IMG[Docker images]
+  CI --> K8S
 ```
 
----
+See [final technical documentation](docs/FINAL_TECHNICAL_DOCUMENTATION.md) and [testing and safety record](docs/FINAL_TESTING_AND_SAFETY.md) for the implemented data flow, boundaries, and limitations.
 
-## 🚀 Quick Start (Local Setup)
+## Repository layout
 
-### Option 1: Docker Compose (All-in-One)
+| Path | Purpose |
+|---|---|
+| `frontend/` | React/Vite dashboard |
+| `backend/` | Express API, MongoDB models, Kubernetes/Prometheus clients |
+| `ai-service/` | FastAPI prediction and RCA service |
+| `ml/` | Canonical features, training pipeline, model artifact, tests |
+| `sample-app/` | Controlled demo workload |
+| `k8s/` | Existing RBAC, demo workload, and Prometheus manifests |
+| `.github/workflows/build.yml` | CI/CD workflow |
+| `scripts/e2e_live_control_loop.js` | Fail-closed live E2E runner |
+
+## Prerequisites
+
+- Node.js 20 (CI version; current local Node should be compatible)
+- Python 3.11
+- MongoDB for backend persistence
+- Docker Desktop for Compose/container use
+- Kubernetes and Prometheus only for live deployment, self-healing, or E2E verification
+
+Copy `.env.example` to `.env` and configure secrets locally. Do not commit populated environment files. At minimum, backend startup needs `MONGO_URI` and `JWT_SECRET`; live copilot analysis additionally needs Kubernetes, Prometheus, and AI-service configuration.
+
+## Local development
+
+Run the stack with Docker Compose:
+
 ```bash
 docker compose up --build
 ```
-* **React Dashboard:** [http://localhost:5173](http://localhost:5173)
-* **Backend API:** [http://localhost:5000](http://localhost:5000)
-* **FastAPI AI Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Prometheus:** [http://localhost:9090](http://localhost:9090)
 
-### Option 2: Step-by-Step Local Run
+`JWT_SECRET` must be supplied to Compose. The standard local endpoints are frontend `http://localhost:5173`, backend `http://localhost:5000`, AI service `http://localhost:8000`, and Prometheus `http://localhost:9090`.
 
-#### 1. FastAPI AI Microservice
+Or start services individually:
+
 ```bash
-cd ai-service
-pip install -r requirements.txt
-python main.py
-# Running on http://localhost:8000
+npm --prefix backend install
+npm --prefix backend start
+
+python -m pip install -r ai-service/requirements.txt
+python ai-service/main.py
+
+npm --prefix frontend install
+npm --prefix frontend run dev
 ```
 
-#### 2. Node.js Backend API
+## Validation
+
 ```bash
-cd backend
-npm install
-npm start
-# Running on http://localhost:5000
+npm --prefix backend test
+python -m pytest ai-service/tests ml/tests
+npm --prefix frontend run build
+git diff --check
 ```
 
-#### 3. React Frontend Dashboard
-```bash
-cd frontend
-npm install
-npm run dev
-# Running on http://localhost:5173
+## Kubernetes and CI/CD
+
+The existing manifests deploy only the demo checkout workload and Prometheus in the `devops-copilot` namespace. Backend, frontend, AI service, and MongoDB have Docker support but no Kubernetes manifests in this repository.
+
+GitHub Actions runs on push, pull request, and manual dispatch. Main-branch publishing/deployment requires `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `KUBE_CONFIG`. It fails if validation, image build/push, Kubernetes apply, rollout/readiness, or the demo workload health endpoint fails. See [Phase 7](docs/PHASE7_GITHUB_ACTIONS_DEPLOYMENT.md).
+
+## Live E2E
+
+The live runner requires a valid backend JWT, a registered Kubernetes-backed service, and reachable backend, MongoDB, AI, Kubernetes, and Prometheus dependencies:
+
+```powershell
+$env:E2E_AUTH_TOKEN = '<valid JWT>'
+$env:BACKEND_URL = 'http://localhost:5000'
+$env:PROMETHEUS_URL = 'http://localhost:9090'
+node scripts/e2e_live_control_loop.js
 ```
 
----
+Live Kubernetes/Prometheus E2E has not been executed in the current environment because its local Kubernetes endpoint was unavailable and no integrated credentials were supplied. See [Phase 9](docs/PHASE9_END_TO_END_TESTING.md).
 
-## 🧪 Running Chaos & Self-Healing Demonstrations
+## Status and limitations
 
-### 1. Interactive Web Dashboard Demo
-1. Open [http://localhost:5173](http://localhost:5173) in your browser.
-2. Click **"Trigger Chaos & Self-Healing"**.
-3. Watch the real-time closed-loop transition:
-   $$\text{INCIDENT DETECTED} \longrightarrow \text{AI DIAGNOSIS (98\% HIGH, ROLLBACK 91\%)} \longrightarrow \text{AUTONOMOUS RECOVERY} \longrightarrow \text{SYSTEM OPERATIONAL (Verified)}$$
+Automated backend tests, AI/ML tests, frontend production build, syntax/preflight checks, Compose configuration validation, and YAML parsing have passed during the recorded phases. Those checks do not prove live deployment or recovery success.
 
-### 2. Standalone End-to-End CLI Demo
-```bash
-node scripts/run_e2e_demo.js
-```
-
----
-
-## 📊 Research Metrics & Evaluation Summary
-* **Supervised ML Model:** Random Forest Classifier trained on multidimensional operational telemetry.
-* **Failure Prediction Accuracy:** **96.8%** (F1-Score: **96.8%**, False Positive Rate: **2.4%**).
-* **AI RCA Confidence:** **91%** on verified CrashLoopBackOff vectors.
-* **Mean Time to Recovery (MTTR):** **~0.83s – 15s** autonomous closed-loop resolution (vs. 15–25 minutes manual human triaging).
-* **Deterministic Safety:** Zero unsafe out-of-bounds operations (enforced by Action Allow-Lists, Namespace Isolation, Cooldowns, and Retry Caps).
-
----
-
-## 📚 Project Documentation
-* [High-Level System Design (HLD)](docs/HLD_System_Design.md)
-* [Low-Level System Design (LLD)](docs/LLD_System_Design.md)
-* [Project Synopsis](docs/PROJECT_SYNOPSIS.md)
-* [Research Evaluation & Benchmark](docs/RESEARCH_EVALUATION.md)
-* [Viva Defense Q&A Guide](docs/VIVA_DEFENSE_QA.md)
-* [Deployment & Setup Guide](docs/DEPLOYMENT_GUIDE.md)
+Key limitations include synthetic ML training data, no current live E2E evidence, process-local recovery locking, non-transactional audit writes, and limited Kubernetes manifests. See the final documentation for details.
